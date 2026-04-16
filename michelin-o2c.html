@@ -1,0 +1,1706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Michelin · OCA Command Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,300;1,9..144,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+<style>
+/* ═══════════════════════════════════════════════════════
+   TOKENS & RESET
+═══════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Michelin palette — black/white/red with warm concrete tones */
+  --ink:      #0d0d0d;
+  --ink2:     #1a1a1a;
+  --ink3:     #2a2a2a;
+  --wire:     #3a3a3a;
+  --mid:      #6b6b6b;
+  --dust:     #a8a8a8;
+  --chalk:    #e8e4de;
+  --cream:    #f5f2ed;
+  --white:    #fafaf8;
+  --red:      #e2001a;
+  --red-dark: #b50015;
+  --red-glow: rgba(226,0,26,0.15);
+  --amber:    #d4820a;
+  --green:    #1a7a3a;
+  --blue:     #1a4a8a;
+  --r:        6px;
+  --r-lg:     12px;
+  --font-head: 'Bebas Neue', sans-serif;
+  --font-body: 'Fraunces', serif;
+  --font-mono: 'DM Mono', monospace;
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  --shadow-sm: 0 2px 10px rgba(0,0,0,0.25);
+}
+
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-body);
+  background: var(--ink);
+  color: var(--chalk);
+  min-height: 100vh;
+  overflow-x: hidden;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Concrete texture overlay */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app { position: relative; z-index: 1; display: flex; min-height: 100vh; }
+
+/* ═══════════════════════════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════════════════════════ */
+.sidebar {
+  width: 230px;
+  background: var(--ink2);
+  border-right: 1px solid var(--wire);
+  display: flex; flex-direction: column;
+  position: fixed; top: 0; left: 0; bottom: 0;
+  z-index: 100;
+}
+
+.sb-brand {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--wire);
+}
+.sb-logo {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 6px;
+}
+.sb-bibendum {
+  width: 36px; height: 36px;
+  background: var(--red);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-head);
+  font-size: 18px; color: var(--white); letter-spacing: -1px;
+  flex-shrink: 0;
+  box-shadow: 0 0 20px var(--red-glow);
+}
+.sb-name { font-family: var(--font-head); font-size: 20px; letter-spacing: 2px; color: var(--white); }
+.sb-sub { font-family: var(--font-mono); font-size: 9px; color: var(--mid); letter-spacing: 3px; text-transform: uppercase; }
+
+.sb-nav { flex: 1; padding: 16px 0; overflow-y: auto; }
+.sb-section {
+  font-family: var(--font-mono); font-size: 8px; color: var(--wire);
+  letter-spacing: 3px; text-transform: uppercase;
+  padding: 12px 20px 4px;
+}
+.sb-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 20px; cursor: pointer;
+  font-family: var(--font-body); font-size: 13px;
+  color: var(--dust); border-left: 2px solid transparent;
+  transition: all .18s; user-select: none;
+  font-weight: 300;
+}
+.sb-item:hover { color: var(--chalk); background: rgba(255,255,255,.03); }
+.sb-item.active {
+  color: var(--white); background: rgba(226,0,26,.08);
+  border-left-color: var(--red);
+}
+.sb-icon { width: 16px; text-align: center; font-size: 13px; opacity: .8; }
+.sb-count {
+  margin-left: auto; background: var(--red);
+  color: var(--white); font-family: var(--font-mono);
+  font-size: 9px; padding: 1px 6px; border-radius: 10px;
+  font-weight: 500;
+}
+.sb-count.warn { background: var(--amber); }
+.sb-count.ok { background: var(--green); }
+
+.sb-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--wire);
+}
+.sb-live {
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--mid);
+}
+.pulse {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px rgba(26,122,58,.8);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.85)} }
+
+/* ═══════════════════════════════════════════════════════
+   MAIN
+═══════════════════════════════════════════════════════ */
+.main { margin-left: 230px; flex: 1; display: flex; flex-direction: column; }
+
+/* TOPBAR */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(13,13,13,.94);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--wire);
+  display: flex; align-items: center;
+  padding: 0 28px; height: 56px; gap: 16px;
+}
+.topbar-title {
+  font-family: var(--font-head);
+  font-size: 22px; letter-spacing: 2px;
+  color: var(--white); flex: 1;
+}
+.topbar-date {
+  font-family: var(--font-mono); font-size: 11px; color: var(--mid);
+}
+.topbar-actions { display: flex; gap: 8px; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: var(--r);
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  cursor: pointer; border: none; transition: all .18s; letter-spacing: .5px;
+}
+.btn-red { background: var(--red); color: var(--white); }
+.btn-red:hover { background: var(--red-dark); transform: translateY(-1px); box-shadow: 0 4px 14px var(--red-glow); }
+.btn-ghost { background: transparent; color: var(--dust); border: 1px solid var(--wire); }
+.btn-ghost:hover { color: var(--chalk); border-color: var(--dust); }
+.btn-dark { background: var(--ink3); color: var(--chalk); border: 1px solid var(--wire); }
+.btn-dark:hover { border-color: var(--dust); }
+
+/* PAGES */
+.page { display: none; padding: 24px 28px; }
+.page.active { display: block; animation: fadeUp .3s ease; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+/* ═══════════════════════════════════════════════════════
+   GRID & LAYOUT PRIMITIVES
+═══════════════════════════════════════════════════════ */
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.g4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.g5 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.g6040 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-bottom: 16px; }
+.g3070 { display: grid; grid-template-columns: 1fr 2.3fr; gap: 16px; margin-bottom: 16px; }
+.mb { margin-bottom: 16px; }
+
+/* PAGE HEADER */
+.ph { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 22px; }
+.ph-title { font-family: var(--font-head); font-size: 28px; letter-spacing: 2px; color: var(--white); }
+.ph-sub { font-family: var(--font-mono); font-size: 10px; color: var(--mid); margin-top: 3px; letter-spacing: 1px; }
+.ph-right { display: flex; gap: 8px; align-items: center; }
+
+/* ═══════════════════════════════════════════════════════
+   PANEL
+═══════════════════════════════════════════════════════ */
+.panel {
+  background: var(--ink2);
+  border: 1px solid var(--wire);
+  border-radius: var(--r-lg);
+  padding: 20px;
+  transition: border-color .2s;
+}
+.panel:hover { border-color: #4a4a4a; }
+.panel-red { border-top: 2px solid var(--red); }
+.panel-amber { border-top: 2px solid var(--amber); }
+.panel-green { border-top: 2px solid var(--green); }
+.panel-blue { border-top: 2px solid var(--blue); }
+
+.panel-hd {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; margin-bottom: 16px;
+}
+.panel-title {
+  font-family: var(--font-head); font-size: 14px; letter-spacing: 1.5px; color: var(--white);
+}
+.panel-sub { font-family: var(--font-mono); font-size: 9.5px; color: var(--mid); margin-top: 3px; }
+.chip {
+  font-family: var(--font-mono); font-size: 9px; padding: 3px 8px; border-radius: 20px;
+  font-weight: 500; letter-spacing: .5px; white-space: nowrap;
+}
+.chip-red { background: rgba(226,0,26,.15); color: #ff6670; border: 1px solid rgba(226,0,26,.3); }
+.chip-amber { background: rgba(212,130,10,.12); color: #e8a030; border: 1px solid rgba(212,130,10,.3); }
+.chip-green { background: rgba(26,122,58,.12); color: #44cc6a; border: 1px solid rgba(26,122,58,.3); }
+.chip-blue { background: rgba(26,74,138,.15); color: #6698d8; border: 1px solid rgba(26,74,138,.3); }
+.chip-white { background: rgba(255,255,255,.06); color: var(--dust); border: 1px solid var(--wire); }
+
+/* ═══════════════════════════════════════════════════════
+   KPI CARDS
+═══════════════════════════════════════════════════════ */
+.kpi {
+  background: var(--ink2); border: 1px solid var(--wire);
+  border-radius: var(--r-lg); padding: 20px 22px;
+  position: relative; overflow: hidden; cursor: default;
+  transition: all .2s;
+}
+.kpi:hover { border-color: #4a4a4a; transform: translateY(-1px); }
+.kpi::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+}
+.kpi-r::before { background: var(--red); }
+.kpi-a::before { background: var(--amber); }
+.kpi-g::before { background: var(--green); }
+.kpi-b::before { background: var(--blue); }
+.kpi-w::before { background: var(--dust); }
+
+.kpi-label { font-family: var(--font-mono); font-size: 9px; color: var(--mid); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+.kpi-val { font-family: var(--font-head); font-size: 34px; letter-spacing: 1px; line-height: 1; }
+.kpi-r .kpi-val { color: #ff6670; }
+.kpi-a .kpi-val { color: #e8a030; }
+.kpi-g .kpi-val { color: #44cc6a; }
+.kpi-b .kpi-val { color: #6698d8; }
+.kpi-w .kpi-val { color: var(--white); }
+.kpi-delta { font-family: var(--font-mono); font-size: 10px; margin-top: 6px; }
+.kpi-target { font-family: var(--font-mono); font-size: 9px; color: var(--mid); margin-top: 3px; }
+.up { color: #44cc6a; } .dn { color: #ff6670; } .neu { color: var(--dust); }
+
+/* ═══════════════════════════════════════════════════════
+   FLOW PIPELINE (O2C stages)
+═══════════════════════════════════════════════════════ */
+.pipeline {
+  display: flex; gap: 0; margin-bottom: 16px; overflow-x: auto;
+}
+.pipe-stage {
+  flex: 1; min-width: 130px;
+  background: var(--ink2); border: 1px solid var(--wire);
+  padding: 14px 16px; cursor: pointer;
+  transition: all .18s; position: relative;
+  text-align: center;
+}
+.pipe-stage:first-child { border-radius: var(--r-lg) 0 0 var(--r-lg); }
+.pipe-stage:last-child  { border-radius: 0 var(--r-lg) var(--r-lg) 0; }
+.pipe-stage.active-stage { background: rgba(226,0,26,.1); border-color: var(--red); z-index: 2; }
+.pipe-stage:not(:last-child)::after {
+  content: '▶';
+  position: absolute; right: -12px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--wire); font-size: 11px; z-index: 3;
+}
+.pipe-stage:hover { background: var(--ink3); }
+.ps-icon { font-size: 18px; margin-bottom: 6px; }
+.ps-name { font-family: var(--font-head); font-size: 11px; letter-spacing: 1px; color: var(--chalk); }
+.ps-count { font-family: var(--font-mono); font-size: 18px; font-weight: 500; margin: 4px 0; }
+.ps-val { font-family: var(--font-mono); font-size: 9px; color: var(--mid); }
+
+/* ═══════════════════════════════════════════════════════
+   TABLE
+═══════════════════════════════════════════════════════ */
+.tbl-wrap { overflow-x: auto; overflow-y: auto; border-radius: var(--r); }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+thead th {
+  background: var(--ink3); padding: 9px 14px;
+  font-family: var(--font-mono); font-size: 9px; font-weight: 500;
+  color: var(--mid); text-transform: uppercase; letter-spacing: 1.5px;
+  position: sticky; top: 0; z-index: 2;
+  border-bottom: 1px solid var(--wire); white-space: nowrap;
+  cursor: pointer; user-select: none;
+}
+thead th:hover { color: var(--chalk); }
+tbody tr { border-bottom: 1px solid rgba(58,58,58,.5); transition: background .12s; }
+tbody tr:hover { background: rgba(255,255,255,.025); }
+tbody td { padding: 8px 14px; color: var(--chalk); white-space: nowrap; }
+td.mono { font-family: var(--font-mono); font-size: 11.5px; }
+
+/* STATUS BADGES */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 20px;
+  font-family: var(--font-mono); font-size: 9.5px; font-weight: 500;
+}
+.badge::before { content: '●'; font-size: 7px; }
+.b-red { background: rgba(226,0,26,.12); color: #ff6670; border: 1px solid rgba(226,0,26,.25); }
+.b-amber { background: rgba(212,130,10,.12); color: #e8a030; border: 1px solid rgba(212,130,10,.25); }
+.b-green { background: rgba(26,122,58,.12); color: #44cc6a; border: 1px solid rgba(26,122,58,.25); }
+.b-blue { background: rgba(26,74,138,.15); color: #6698d8; border: 1px solid rgba(26,74,138,.25); }
+.b-gray { background: rgba(255,255,255,.05); color: var(--dust); border: 1px solid var(--wire); }
+
+/* ═══════════════════════════════════════════════════════
+   ALERT STRIP
+═══════════════════════════════════════════════════════ */
+.alert {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 16px; border-radius: var(--r);
+  margin-bottom: 10px; border-left: 3px solid;
+}
+.alert-crit { background: rgba(226,0,26,.06); border-color: var(--red); }
+.alert-warn { background: rgba(212,130,10,.06); border-color: var(--amber); }
+.alert-info { background: rgba(26,74,138,.06); border-color: var(--blue); }
+.alert-ok   { background: rgba(26,122,58,.06);  border-color: var(--green); }
+.alert-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.alert-title { font-family: var(--font-head); font-size: 13px; letter-spacing: 1px; margin-bottom: 2px; }
+.alert-desc { font-size: 12px; color: var(--dust); line-height: 1.5; }
+.alert-time { font-family: var(--font-mono); font-size: 9px; color: var(--mid); margin-top: 4px; }
+.alert-action { margin-left: auto; flex-shrink: 0; }
+
+/* ═══════════════════════════════════════════════════════
+   PROGRESS BARS
+═══════════════════════════════════════════════════════ */
+.prog-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.prog-label { font-family: var(--font-mono); font-size: 10px; color: var(--dust); flex: 0 0 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prog-track { flex: 1; height: 5px; background: var(--ink3); border-radius: 3px; overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 3px; transition: width 1s cubic-bezier(.4,0,.2,1); }
+.prog-val { font-family: var(--font-mono); font-size: 10px; color: var(--dust); flex: 0 0 44px; text-align: right; }
+
+/* ═══════════════════════════════════════════════════════
+   TIMELINE / GANTT (Delivery tracking)
+═══════════════════════════════════════════════════════ */
+.timeline-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid rgba(58,58,58,.4);
+}
+.tl-id { font-family: var(--font-mono); font-size: 10px; color: var(--mid); width: 80px; flex-shrink: 0; }
+.tl-name { font-size: 12px; color: var(--chalk); width: 130px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-bar-wrap { flex: 1; height: 22px; background: var(--ink3); border-radius: 3px; position: relative; overflow: hidden; }
+.tl-bar { height: 100%; border-radius: 3px; display: flex; align-items: center; padding-left: 8px; }
+.tl-bar-label { font-family: var(--font-mono); font-size: 9px; color: rgba(255,255,255,.8); white-space: nowrap; }
+.tl-eta { font-family: var(--font-mono); font-size: 10px; color: var(--mid); width: 70px; text-align: right; flex-shrink: 0; }
+
+/* ═══════════════════════════════════════════════════════
+   AUTOMATION RULE CARD
+═══════════════════════════════════════════════════════ */
+.rule-card {
+  background: var(--ink3); border: 1px solid var(--wire);
+  border-radius: var(--r); padding: 14px 16px;
+  margin-bottom: 10px; display: flex; align-items: flex-start; gap: 14px;
+}
+.rule-icon {
+  width: 38px; height: 38px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+.rule-title { font-family: var(--font-head); font-size: 13px; letter-spacing: 1px; margin-bottom: 4px; }
+.rule-desc { font-size: 11.5px; color: var(--dust); line-height: 1.5; }
+.rule-trigger { font-family: var(--font-mono); font-size: 9px; color: var(--mid); margin-top: 5px; }
+.rule-toggle {
+  margin-left: auto; flex-shrink: 0;
+  width: 38px; height: 20px; background: var(--green); border-radius: 10px;
+  position: relative; cursor: pointer; transition: background .2s;
+}
+.rule-toggle::after {
+  content: ''; position: absolute; top: 2px; right: 2px;
+  width: 16px; height: 16px; border-radius: 50%; background: var(--white);
+  transition: right .2s;
+}
+.rule-toggle.off { background: var(--wire); }
+.rule-toggle.off::after { right: 20px; }
+
+/* ═══════════════════════════════════════════════════════
+   MODAL
+═══════════════════════════════════════════════════════ */
+.modal-bg {
+  position: fixed; inset: 0; background: rgba(0,0,0,.75);
+  backdrop-filter: blur(4px); z-index: 200;
+  display: none; align-items: center; justify-content: center;
+}
+.modal-bg.open { display: flex; }
+.modal {
+  background: var(--ink2); border: 1px solid var(--wire);
+  border-radius: var(--r-lg); padding: 28px; width: 560px;
+  max-width: 95vw; max-height: 85vh; overflow-y: auto;
+  animation: fadeUp .25s ease;
+}
+.modal-title { font-family: var(--font-head); font-size: 22px; letter-spacing: 2px; margin-bottom: 4px; }
+.modal-sub { font-family: var(--font-mono); font-size: 10px; color: var(--mid); margin-bottom: 22px; }
+.form-row { margin-bottom: 14px; }
+.form-label { font-family: var(--font-mono); font-size: 9px; color: var(--mid); letter-spacing: 1.5px; text-transform: uppercase; display: block; margin-bottom: 5px; }
+.form-input {
+  width: 100%; background: var(--ink3); border: 1px solid var(--wire);
+  border-radius: var(--r); color: var(--chalk); padding: 9px 12px;
+  font-family: var(--font-mono); font-size: 12px; outline: none;
+  transition: border-color .2s;
+}
+.form-input:focus { border-color: var(--dust); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--ink); }
+::-webkit-scrollbar-thumb { background: var(--wire); border-radius: 3px; }
+
+/* CHART */
+.chart-box { position: relative; }
+
+/* STAT MINI */
+.stat-mini {
+  display: flex; flex-direction: column;
+  background: var(--ink3); border-radius: var(--r);
+  padding: 12px 14px;
+}
+.sm-label { font-family: var(--font-mono); font-size: 8.5px; color: var(--mid); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; }
+.sm-val { font-family: var(--font-head); font-size: 22px; letter-spacing: 1px; }
+.sm-note { font-family: var(--font-mono); font-size: 9px; color: var(--mid); margin-top: 2px; }
+
+/* NOTIFICATION DOT */
+.notif { position: relative; }
+.notif::after {
+  content: ''; position: absolute; top: -3px; right: -3px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--red); border: 1px solid var(--ink);
+}
+
+/* Separator */
+.sep { height: 1px; background: var(--wire); margin: 18px 0; }
+</style>
+</head>
+
+<body>
+<div class="app">
+
+<!-- ═══════════════════════════════════════════════════════
+     SIDEBAR
+═══════════════════════════════════════════════════════ -->
+<aside class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo">
+      <div class="sb-bibendum">M</div>
+      <span class="sb-name">MICHELIN</span>
+    </div>
+    <div class="sb-sub">OCA · Command Center</div>
+  </div>
+
+  <nav class="sb-nav">
+    <div class="sb-section">Overview</div>
+    <div class="sb-item active" onclick="nav('dashboard',this)">
+      <span class="sb-icon">⬛</span><span>O2C Dashboard</span>
+    </div>
+    <div class="sb-item" onclick="nav('pipeline',this)">
+      <span class="sb-icon">▶</span><span>Live Pipeline</span>
+      <span class="sb-count">247</span>
+    </div>
+
+    <div class="sb-section">Demand Management</div>
+    <div class="sb-item" onclick="nav('orders',this)">
+      <span class="sb-icon">📋</span><span>Order Management</span>
+      <span class="sb-count">18</span>
+    </div>
+    <div class="sb-item" onclick="nav('forecast',this)">
+      <span class="sb-icon">📈</span><span>Demand Forecast</span>
+    </div>
+
+    <div class="sb-section">Supply & Logistics</div>
+    <div class="sb-item" onclick="nav('delivery',this)">
+      <span class="sb-icon">🚚</span><span>Delivery Tracker</span>
+      <span class="sb-count warn">5</span>
+    </div>
+    <div class="sb-item" onclick="nav('warehouse',this)">
+      <span class="sb-icon">🏭</span><span>Warehouse / 3PL</span>
+    </div>
+
+    <div class="sb-section">Finance</div>
+    <div class="sb-item" onclick="nav('invoice',this)">
+      <span class="sb-icon">🧾</span><span>Invoice to Cash</span>
+      <span class="sb-count warn">12</span>
+    </div>
+    <div class="sb-item" onclick="nav('ar',this)">
+      <span class="sb-icon">💳</span><span>AR & Collections</span>
+      <span class="sb-count">3</span>
+    </div>
+
+    <div class="sb-section">System</div>
+    <div class="sb-item" onclick="nav('automation',this)">
+      <span class="sb-icon">⚙️</span><span>Automation Rules</span>
+      <span class="sb-count ok">14</span>
+    </div>
+    <div class="sb-item" onclick="nav('audit',this)">
+      <span class="sb-icon">🔍</span><span>Audit Log</span>
+    </div>
+  </nav>
+
+  <div class="sb-footer">
+    <div class="sb-live"><div class="pulse"></div>System Online · SFDC ✓ SAP ✓</div>
+    <div style="font-family:var(--font-mono);font-size:9px;color:var(--wire);margin-top:4px">VIETNAM CLUSTER · v4.2.1</div>
+  </div>
+</aside>
+
+<!-- ═══════════════════════════════════════════════════════
+     MAIN AREA
+═══════════════════════════════════════════════════════ -->
+<main class="main">
+<div class="topbar">
+  <div class="topbar-title" id="topbar-title">O2C DASHBOARD</div>
+  <div class="topbar-date" id="topbar-date"></div>
+  <div class="topbar-actions">
+    <button class="btn btn-ghost notif">🔔</button>
+    <button class="btn btn-ghost" onclick="exportData()">↓ EXPORT</button>
+    <button class="btn btn-red" onclick="openOrderModal()">+ NEW ORDER</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: DASHBOARD
+═══════════════════════════════════════════════════════ -->
+<div class="page active" id="p-dashboard">
+  <div class="ph">
+    <div>
+      <div class="ph-title">O2C PERFORMANCE DASHBOARD</div>
+      <div class="ph-sub">REAL-TIME · VIETNAM CLUSTER · FY2025 · ALL CHANNELS</div>
+    </div>
+    <div class="ph-right">
+      <select class="form-input" style="width:auto;padding:6px 10px;font-size:10px" onchange="updatePeriod(this.value)">
+        <option>MTD — Apr 2025</option>
+        <option>QTD — Q1 2025</option>
+        <option>YTD — 2025</option>
+        <option>Full Year 2024</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- KPI ROW 1 -->
+  <div class="g5 mb">
+    <div class="kpi kpi-g">
+      <div class="kpi-label">Order Fulfillment Rate</div>
+      <div class="kpi-val">96.4%</div>
+      <div class="kpi-delta up">▲ +2.1% vs last month</div>
+      <div class="kpi-target">Target: ≥ 95%  ✓</div>
+    </div>
+    <div class="kpi kpi-a">
+      <div class="kpi-label">OTIF Rate</div>
+      <div class="kpi-val">91.7%</div>
+      <div class="kpi-delta dn">▼ −1.3% vs last month</div>
+      <div class="kpi-target">Target: ≥ 95%  ⚠</div>
+    </div>
+    <div class="kpi kpi-g">
+      <div class="kpi-label">Invoice Accuracy</div>
+      <div class="kpi-val">99.2%</div>
+      <div class="kpi-delta up">▲ +0.4% vs last month</div>
+      <div class="kpi-target">Target: ≥ 99%  ✓</div>
+    </div>
+    <div class="kpi kpi-b">
+      <div class="kpi-label">DSO (Days Sales Out.)</div>
+      <div class="kpi-val">32.4d</div>
+      <div class="kpi-delta up">▼ −2.8d vs last month</div>
+      <div class="kpi-target">Target: ≤ 35d  ✓</div>
+    </div>
+    <div class="kpi kpi-r">
+      <div class="kpi-label">Overdue AR</div>
+      <div class="kpi-val">$1.24M</div>
+      <div class="kpi-delta dn">▲ +$120K vs last month</div>
+      <div class="kpi-target">Alert: 3 accounts</div>
+    </div>
+  </div>
+
+  <!-- KPI ROW 2 -->
+  <div class="g5 mb">
+    <div class="kpi kpi-w">
+      <div class="kpi-label">Active Orders</div>
+      <div class="kpi-val">247</div>
+      <div class="kpi-delta neu">18 pending confirm</div>
+    </div>
+    <div class="kpi kpi-g">
+      <div class="kpi-label">Revenue MTD</div>
+      <div class="kpi-val">$8.7M</div>
+      <div class="kpi-delta up">▲ +14% vs Apr 2024</div>
+    </div>
+    <div class="kpi kpi-a">
+      <div class="kpi-label">Cash Collected MTD</div>
+      <div class="kpi-val">$7.1M</div>
+      <div class="kpi-delta up">▲ 81.6% collection rate</div>
+    </div>
+    <div class="kpi kpi-g">
+      <div class="kpi-label">On-Time Delivery</div>
+      <div class="kpi-val">94.2%</div>
+      <div class="kpi-delta up">▲ +1.7% MoM</div>
+    </div>
+    <div class="kpi kpi-b">
+      <div class="kpi-label">SLA Compliance</div>
+      <div class="kpi-val">98.1%</div>
+      <div class="kpi-delta up">▲ System auto-escalated 4</div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW -->
+  <div class="g6040">
+    <div class="panel">
+      <div class="panel-hd">
+        <div><div class="panel-title">O2C REVENUE & CASH FLOW — MTD 2025</div><div class="panel-sub">Daily invoiced vs collected</div></div>
+        <span class="chip chip-green">+14% YoY</span>
+      </div>
+      <div class="chart-box"><canvas id="ch-revenue" height="195"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd">
+        <div><div class="panel-title">ORDER STATUS MIX</div><div class="panel-sub">247 active orders</div></div>
+      </div>
+      <div class="chart-box"><canvas id="ch-status-donut" height="195"></canvas></div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 2 -->
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-hd">
+        <div><div class="panel-title">OTIF TREND — 12 MONTHS</div><div class="panel-sub">On-Time In-Full rate</div></div>
+        <span class="chip chip-amber">⚠ Below target</span>
+      </div>
+      <div class="chart-box"><canvas id="ch-otif" height="150"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd">
+        <div><div class="panel-title">AR AGING BREAKDOWN</div><div class="panel-sub">Outstanding receivables by bucket</div></div>
+      </div>
+      <div class="chart-box"><canvas id="ch-aging" height="150"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ALERTS -->
+  <div class="panel mb">
+    <div class="panel-hd">
+      <div><div class="panel-title">🔔 AUTOMATED ALERTS — ACTIVE INCIDENTS</div><div class="panel-sub">System-generated · Auto-escalated to Core Team where required</div></div>
+      <span class="chip chip-red">5 OPEN</span>
+    </div>
+    <div class="alert alert-crit">
+      <div class="alert-icon">🔴</div>
+      <div>
+        <div class="alert-title">PAYMENT OVERDUE — VIET PIONEER AUTO JSC</div>
+        <div class="alert-desc">Invoice #INV-2025-0847 · $218,400 · 47 days overdue. Exceeds 45-day credit limit. Auto-hold placed on new orders. Escalated to Finance Director.</div>
+        <div class="alert-time">⚡ Auto-triggered · Apr 16, 09:14 · Rule: AR-HOLD-45D</div>
+      </div>
+      <div class="alert-action"><button class="btn btn-red" style="font-size:10px">View Account</button></div>
+    </div>
+    <div class="alert alert-warn">
+      <div class="alert-icon">🟡</div>
+      <div>
+        <div class="alert-title">DELIVERY DELAY — ORDER ORD-2025-1124</div>
+        <div class="alert-desc">3PL GHN reported road closure on QL1A corridor. ETA shifted +2 days for Ho Chi Minh → Da Nang route. 8 orders affected. Customer notifications auto-sent.</div>
+        <div class="alert-time">⚡ Auto-triggered · Apr 16, 07:31 · Rule: DELIVERY-DELAY-NOTIFY</div>
+      </div>
+      <div class="alert-action"><button class="btn btn-dark" style="font-size:10px">Track</button></div>
+    </div>
+    <div class="alert alert-warn">
+      <div class="alert-icon">🟡</div>
+      <div>
+        <div class="alert-title">LOW STOCK ALERT — MICHELIN PILOT SPORT 5 (225/45R17)</div>
+        <div class="alert-desc">Warehouse HCM: 124 units remaining (≤ 7-day cover). Safety stock threshold breached. Auto-replenishment PO raised to regional hub: PR-2025-0312.</div>
+        <div class="alert-time">⚡ Auto-triggered · Apr 15, 22:00 · Rule: STOCK-SAFETY-THRESHOLD</div>
+      </div>
+      <div class="alert-action"><button class="btn btn-dark" style="font-size:10px">Review PO</button></div>
+    </div>
+    <div class="alert alert-info">
+      <div class="alert-icon">🔵</div>
+      <div>
+        <div class="alert-title">SFDC–SAP SYNC ANOMALY — 3 ORDERS</div>
+        <div class="alert-desc">Interface latency detected: orders ORD-1138, ORD-1139, ORD-1141 pending BSC confirmation > 2h. Retry initiated. Core Team notified via Jira ticket #OCA-4421.</div>
+        <div class="alert-time">⚡ Auto-triggered · Apr 16, 08:52 · Rule: ERP-SYNC-WATCHDOG</div>
+      </div>
+      <div class="alert-action"><button class="btn btn-dark" style="font-size:10px">Jira ↗</button></div>
+    </div>
+    <div class="alert alert-ok">
+      <div class="alert-icon">🟢</div>
+      <div>
+        <div class="alert-title">AUTO-RECONCILIATION COMPLETE — MARCH 2025</div>
+        <div class="alert-desc">Monthly AR-GL reconciliation executed. 1,842 transactions matched. 3 exceptions flagged and routed to Finance team. Zero manual intervention required.</div>
+        <div class="alert-time">⚡ Auto-completed · Apr 1, 01:30 · Rule: MONTH-END-RECON</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM: Channel perf + Top customers -->
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-hd"><div><div class="panel-title">REVENUE BY CHANNEL</div><div class="panel-sub">MTD · All segments</div></div></div>
+      <div class="chart-box"><canvas id="ch-channel" height="160"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd"><div><div class="panel-title">TOP 8 CUSTOMERS — REVENUE MTD</div></div></div>
+      <div id="top-customers"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: LIVE PIPELINE
+═══════════════════════════════════════════════════════ -->
+<div class="page" id="p-pipeline">
+  <div class="ph">
+    <div><div class="ph-title">O2C LIVE PIPELINE</div><div class="ph-sub">247 ACTIVE TRANSACTIONS ACROSS ALL STAGES · REAL-TIME</div></div>
+    <div class="ph-right"><button class="btn btn-ghost">↻ REFRESH</button></div>
+  </div>
+
+  <!-- Pipeline stages -->
+  <div class="pipeline mb">
+    <div class="pipe-stage active-stage">
+      <div class="ps-icon">📝</div>
+      <div class="ps-name">ORDER CAPTURE</div>
+      <div class="ps-count" style="color:#6698d8">18</div>
+      <div class="ps-val">Pending confirm</div>
+    </div>
+    <div class="pipe-stage">
+      <div class="ps-icon">✅</div>
+      <div class="ps-name">ORDER CONFIRMED</div>
+      <div class="ps-count" style="color:#44cc6a">62</div>
+      <div class="ps-val">In processing</div>
+    </div>
+    <div class="pipe-stage">
+      <div class="ps-icon">🏭</div>
+      <div class="ps-name">WAREHOUSE</div>
+      <div class="ps-count" style="color:#e8a030">44</div>
+      <div class="ps-val">Pick & pack</div>
+    </div>
+    <div class="pipe-stage">
+      <div class="ps-icon">🚚</div>
+      <div class="ps-name">IN TRANSIT</div>
+      <div class="ps-count" style="color:#e8a030">79</div>
+      <div class="ps-val">5 delayed</div>
+    </div>
+    <div class="pipe-stage">
+      <div class="ps-icon">📦</div>
+      <div class="ps-name">DELIVERED</div>
+      <div class="ps-count" style="color:#44cc6a">31</div>
+      <div class="ps-val">Awaiting POD</div>
+    </div>
+    <div class="pipe-stage">
+      <div class="ps-icon">🧾</div>
+      <div class="ps-name">INVOICED</div>
+      <div class="ps-count" style="color:#6698d8">8</div>
+      <div class="ps-val">Sent to BSC</div>
+    </div>
+    <div class="pipe-stage">
+      <div class="ps-icon">💰</div>
+      <div class="ps-name">COLLECTED</div>
+      <div class="ps-count" style="color:#44cc6a">5</div>
+      <div class="ps-val">Cleared today</div>
+    </div>
+  </div>
+
+  <!-- Flow chart -->
+  <div class="panel mb">
+    <div class="panel-hd">
+      <div><div class="panel-title">TRANSACTION FLOW — HOURLY THROUGHPUT TODAY</div></div>
+      <span class="chip chip-green">AUTO-REFRESH 5m</span>
+    </div>
+    <div class="chart-box"><canvas id="ch-throughput" height="170"></canvas></div>
+  </div>
+
+  <!-- Active order table -->
+  <div class="panel">
+    <div class="panel-hd">
+      <div><div class="panel-title">ACTIVE ORDER REGISTER</div><div class="panel-sub">Live view · Click row for detail</div></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" class="form-input" placeholder="Search order / customer..." style="width:200px;padding:6px 10px;font-size:11px" oninput="filterOrders(this.value)">
+        <select class="form-input" style="width:auto;padding:6px 10px;font-size:10px" onchange="filterOrderStatus(this.value)">
+          <option value="">All Status</option>
+          <option>Pending</option><option>Confirmed</option>
+          <option>In Transit</option><option>Delivered</option><option>Invoiced</option>
+        </select>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="max-height:400px">
+      <table>
+        <thead><tr>
+          <th onclick="sortTbl('ord','id')">ORDER ID ↕</th>
+          <th onclick="sortTbl('ord','customer')">CUSTOMER ↕</th>
+          <th onclick="sortTbl('ord','product')">PRODUCT</th>
+          <th onclick="sortTbl('ord','qty')">QTY ↕</th>
+          <th onclick="sortTbl('ord','value')">VALUE ↕</th>
+          <th onclick="sortTbl('ord','channel')">CHANNEL</th>
+          <th onclick="sortTbl('ord','status')">STATUS ↕</th>
+          <th onclick="sortTbl('ord','date')">ORDER DATE ↕</th>
+          <th onclick="sortTbl('ord','eta')">ETA ↕</th>
+          <th>ACTION</th>
+        </tr></thead>
+        <tbody id="order-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: ORDER MANAGEMENT
+═══════════════════════════════════════════════════════ -->
+<div class="page" id="p-orders">
+  <div class="ph">
+    <div><div class="ph-title">ORDER MANAGEMENT</div><div class="ph-sub">MULTICHANNEL CAPTURE · SFDC + E-ORDERING PORTAL · AUTO-VALIDATE</div></div>
+    <div class="ph-right"><button class="btn btn-red" onclick="openOrderModal()">+ CREATE ORDER</button></div>
+  </div>
+
+  <div class="g4 mb">
+    <div class="stat-mini"><div class="sm-label">New Today</div><div class="sm-val" style="color:#6698d8">23</div><div class="sm-note">Auto-captured from SFDC</div></div>
+    <div class="stat-mini"><div class="sm-label">Pending Approval</div><div class="sm-val" style="color:#e8a030">18</div><div class="sm-note">Credit check required</div></div>
+    <div class="stat-mini"><div class="sm-label">Blocked (Credit)</div><div class="sm-val" style="color:#ff6670">3</div><div class="sm-note">Exceeds limit</div></div>
+    <div class="stat-mini"><div class="sm-label">Auto-Confirmed</div><div class="sm-val" style="color:#44cc6a">87%</div><div class="sm-note">No human touch</div></div>
+  </div>
+
+  <div class="g6040">
+    <div class="panel">
+      <div class="panel-hd"><div><div class="panel-title">ORDER INTAKE BY CHANNEL — MTD</div></div></div>
+      <div class="chart-box"><canvas id="ch-intake" height="170"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd"><div><div class="panel-title">AUTO-PROCESSING PIPELINE</div><div class="panel-sub">Order automation workflow</div></div></div>
+      <div id="order-auto-flow"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-hd">
+      <div><div class="panel-title">PENDING ORDERS — REQUIRES ACTION</div></div>
+      <span class="chip chip-amber">18 AWAITING</span>
+    </div>
+    <div class="tbl-wrap" style="max-height:350px">
+      <table>
+        <thead><tr><th>ORDER ID</th><th>CUSTOMER</th><th>PRODUCT</th><th>VALUE</th><th>CREDIT STATUS</th><th>BLOCKED REASON</th><th>DAYS PENDING</th><th>ACTION</th></tr></thead>
+        <tbody id="pending-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: DEMAND FORECAST
+═══════════════════════════════════════════════════════ -->
+<div class="page" id="p-forecast">
+  <div class="ph">
+    <div><div class="ph-title">DEMAND FORECAST</div><div class="ph-sub">STATISTICAL MODEL · 12-MONTH HORIZON · AUTO-UPDATED WEEKLY</div></div>
+  </div>
+  <div class="g3 mb">
+    <div class="stat-mini"><div class="sm-label">Forecast Accuracy (MAPE)</div><div class="sm-val" style="color:#44cc6a">88.4%</div><div class="sm-note">L3M average · Model v3.2</div></div>
+    <div class="stat-mini"><div class="sm-label">Q2 2025 Forecast</div><div class="sm-val" style="color:#6698d8">$26.1M</div><div class="sm-note">+11% vs Q2 2024</div></div>
+    <div class="stat-mini"><div class="sm-label">SKUs Tracked</div><div class="sm-val" style="color:#e8a030">1,847</div><div class="sm-note">ABC-classified</div></div>
+  </div>
+  <div class="panel mb">
+    <div class="panel-hd"><div><div class="panel-title">12-MONTH DEMAND FORECAST vs ACTUAL</div><div class="panel-sub">Revenue · Statistical baseline + commercial intelligence overlay</div></div><span class="chip chip-blue">AUTO-RUNS EVERY MONDAY</span></div>
+    <div class="chart-box"><canvas id="ch-demand-fc" height="210"></canvas></div>
+  </div>
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-hd"><div><div class="panel-title">TOP 10 SKUs — VOLUME FORECAST</div></div></div>
+      <div id="sku-forecast"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd"><div><div class="panel-title">SEASONALITY INDEX BY MONTH</div></div></div>
+      <div class="chart-box"><canvas id="ch-season" height="200"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: DELIVERY TRACKER
+═══════════════════════════════════════════════════════ -->
+<div class="page" id="p-delivery">
+  <div class="ph">
+    <div><div class="ph-title">DELIVERY TRACKER</div><div class="ph-sub">3PL INTEGRATION · REAL-TIME GPS · AUTO-NOTIFY ON EXCEPTION</div></div>
+  </div>
+  <div class="g4 mb">
+    <div class="stat-mini"><div class="sm-label">In Transit</div><div class="sm-val" style="color:#6698d8">79</div><div class="sm-note">Active shipments</div></div>
+    <div class="stat-mini"><div class="sm-label">On Schedule</div><div class="sm-val" style="color:#44cc6a">74</div><div class="sm-note">93.7%</div></div>
+    <div class="stat-mini"><div class="sm-label">Delayed</div><div class="sm-val" style="color:#ff6670">5</div><div class="sm-note">Auto-notified customers</div></div>
+    <div class="stat-mini"><div class="sm-label">Avg Transit Time</div><div class="sm-val" style="color:#e8a030">1.8d</div><div class="sm-note">Target ≤ 2 days</div></div>
+  </div>
+
+  <div class="panel mb">
+    <div class="panel-hd"><div><div class="panel-title">ACTIVE SHIPMENTS — GANTT VIEW</div><div class="panel-sub">Shipment timeline · Red = delayed</div></div><span class="chip chip-red">5 DELAYED</span></div>
+    <div id="gantt-view"></div>
+  </div>
+
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-hd"><div><div class="panel-title">3PL PERFORMANCE SCORECARD</div></div></div>
+      <div id="tpl-scorecard"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd"><div><div class="panel-title">DELIVERY ROUTE HEATMAP</div><div class="panel-sub">Volume by region</div></div></div>
+      <div class="chart-box"><canvas id="ch-region" height="200"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: INVOICE TO CASH
+═══════════════════════════════════════════════════════ -->
+<div class="page" id="p-invoice">
+  <div class="ph">
+    <div><div class="ph-title">INVOICE TO CASH</div><div class="ph-sub">AUTO-GENERATED · E-INVOICE · BSC SYNC · SFDC LINKED</div></div>
+    <div class="ph-right"><button class="btn btn-red" onclick="runAutoInvoice()">⚡ RUN AUTO-INVOICE</button></div>
+  </div>
+  <div class="g5 mb">
+    <div class="stat-mini"><div class="sm-label">Invoiced MTD</div><div class="sm-val" style="color:#6698d8">$8.74M</div></div>
+    <div class="stat-mini"><div class="sm-label">Auto-Generated</div><div class="sm-val" style="color:#44cc6a">98.1%</div><div class="sm-note">No manual touch</div></div>
+    <div class="stat-mini"><div class="sm-label">Pending Invoicing</div><div class="sm-val" style="color:#e8a030">12</div><div class="sm-note">POD received, queued</div></div>
+    <div class="stat-mini"><div class="sm-label">Invoice Disputes</div><div class="sm-val" style="color:#ff6670">4</div><div class="sm-note">Under review</div></div>
+    <div class="stat-mini"><div class="sm-label">Avg Invoice Cycle</div><div class="sm-val" style="color:#6698d8">4.2h</div><div class="sm-note">POD → Invoice sent</div></div>
+  </div>
+
+  <div class="g6040">
+    <div class="panel">
+      <div class="panel-hd"><div><div class="panel-title">INVOICE CYCLE AUTOMATION</div><div class="panel-sub">POD → Invoice → BSC → SFDC sync</div></div></div>
+      <div class="chart-box"><canvas id="ch-inv-flow" height="180"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd"><div><div class="panel-title">INVOICE QUEUE — PENDING</div></div><span class="chip chip-amber">12</span></div>
+      <div id="inv-queue"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-hd"><div><div class="panel-title">RECENT INVOICES</div></div></div>
+    <div class="tbl-wrap" style="max-height:320px">
+      <table>
+        <thead><tr><th>INVOICE #</th><th>ORDER REF</th><th>CUSTOMER</th><th>AMOUNT</th><th>ISSUE DATE</th><th>DUE DATE</th><th>STATUS</th><th>CHANNEL</th></tr></thead>
+        <tbody id="inv-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: AR & COLLECTIONS
+═══════════════════════════════════════════════════════ -->
+<div class="page" id="p-ar">
+  <div class="ph">
+    <div><div class="ph-title">AR & COLLECTIONS</div><div class="ph-sub">AUTO-DUNNING · CREDIT MANAGEMENT · PAYMENT MATCHING</div></div>
+    <div class="ph-right"><button class="btn btn-red" onclick="runDunning()">⚡ RUN DUNNING</button></div>
+  </div>
+  <div class="g4 mb">
+    <div class="stat-mini"><div class="sm-label">Total AR Outstanding</div><div class="sm-val" style="color:#e8a030">$4.82M</div></div>
+    <div class="stat-mini"><div class="sm-label">Overdue (> 30d)</div><div class="sm-val" style="color:#ff6670">$1.24M</div><div class="sm-note">3 accounts on hold</div></div>
+    <div class="stat-mini"><div class="sm-label">Current (≤ 30d)</div><div class="sm-val" style="color:#44cc6a">$3.58M</div></div>
+    <div class="stat-mini"><div class="sm-label">DSO</div><div class="sm-val" style="color:#6698d8">32.4d</div><div class="sm-note">Target ≤ 35d ✓</div></div>
+  </div>
+
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-hd"><div><div class="panel-title">AR AGING ANALYSIS</div></div></div>
+      <div class="chart-box"><canvas id="ch-aging2" height="200"></canvas></div>
+    </div>
+    <div class="panel panel-red">
+      <div class="panel-hd"><div><div class="panel-title">🚨 OVERDUE ACCOUNTS — AUTO-HOLD</div></div><span class="chip chip-red">3 BLOCKED</span></div>
+      <div id="overdue-list"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-hd"><div><div class="panel-title">PAYMENT COLLECTION REGISTER</div></div></div>
+    <div class="tbl-wrap" style="max-height:320px">
+      <table>
+        <thead><tr><th>ACCOUNT</th><th>OUTSTANDING</th><th>CURRENT</th><th>30d</th><th>60d</th><th>90d+</th><th>CREDIT LIMIT</th><th>UTILIZATION</th><th>STATUS</th><th>LAST DUNNING</th></tr></thead>
+        <tbody id="ar-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: AUTOMATION RULES
+═══════════════════════════════════════════════════════ -->
+<div class="page" id="p-automation">
+  <div class="ph">
+    <div><div class="ph-title">AUTOMATION RULES ENGINE</div><div class="ph-sub">14 ACTIVE RULES · SFDC + SAP/BSC + 3PL INTEGRATED · ZERO-TOUCH PROCESSING</div></div>
+    <div class="ph-right"><button class="btn btn-red">+ ADD RULE</button></div>
+  </div>
+  <div class="g4 mb">
+    <div class="stat-mini"><div class="sm-label">Rules Active</div><div class="sm-val" style="color:#44cc6a">14</div></div>
+    <div class="stat-mini"><div class="sm-label">Triggers Today</div><div class="sm-val" style="color:#6698d8">847</div></div>
+    <div class="stat-mini"><div class="sm-label">Auto-Resolved</div><div class="sm-val" style="color:#44cc6a">839</div><div class="sm-note">99.1% auto-rate</div></div>
+    <div class="stat-mini"><div class="sm-label">Human Escalations</div><div class="sm-val" style="color:#e8a030">8</div></div>
+  </div>
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-hd"><div><div class="panel-title">ORDER AUTOMATION RULES</div></div></div>
+      <div id="rules-orders"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd"><div><div class="panel-title">FINANCE AUTOMATION RULES</div></div></div>
+      <div id="rules-finance"></div>
+    </div>
+  </div>
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-hd"><div><div class="panel-title">LOGISTICS AUTOMATION RULES</div></div></div>
+      <div id="rules-logistics"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd"><div><div class="panel-title">SYSTEM INTEGRATION RULES</div></div></div>
+      <div id="rules-system"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: AUDIT LOG
+═══════════════════════════════════════════════════════ -->
+<div class="page" id="p-audit">
+  <div class="ph">
+    <div><div class="ph-title">AUDIT LOG</div><div class="ph-sub">ALL O2C EVENTS · IMMUTABLE · GDPR COMPLIANT</div></div>
+    <div class="ph-right"><button class="btn btn-ghost">↓ EXPORT AUDIT</button></div>
+  </div>
+  <div class="panel">
+    <div class="panel-hd">
+      <div><div class="panel-title">SYSTEM EVENT LOG — LAST 24H</div></div>
+      <input type="text" class="form-input" placeholder="Filter events..." style="width:200px;padding:6px 10px;font-size:11px">
+    </div>
+    <div class="tbl-wrap" style="max-height:520px">
+      <table>
+        <thead><tr><th>TIMESTAMP</th><th>EVENT TYPE</th><th>ENTITY</th><th>ENTITY ID</th><th>ACTION</th><th>USER / SYSTEM</th><th>STATUS</th><th>DETAIL</th></tr></thead>
+        <tbody id="audit-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: WAREHOUSE
+═══════════════════════════════════════════════════════ -->
+<div class="page" id="p-warehouse">
+  <div class="ph">
+    <div><div class="ph-title">WAREHOUSE & 3PL</div><div class="ph-sub">WMS INTEGRATION · STOCK VISIBILITY · AUTO-REPLENISHMENT</div></div>
+  </div>
+  <div class="g4 mb">
+    <div class="stat-mini"><div class="sm-label">Total Stock Value</div><div class="sm-val" style="color:#6698d8">$3.2M</div></div>
+    <div class="stat-mini"><div class="sm-label">SKUs In Stock</div><div class="sm-val" style="color:#44cc6a">1,624</div><div class="sm-note">of 1,847 active</div></div>
+    <div class="stat-mini"><div class="sm-label">Pick Accuracy</div><div class="sm-val" style="color:#44cc6a">99.7%</div></div>
+    <div class="stat-mini"><div class="sm-label">Low Stock Alerts</div><div class="sm-val" style="color:#ff6670">23</div><div class="sm-note">Auto-PO raised: 18</div></div>
+  </div>
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-hd"><div><div class="panel-title">WAREHOUSE UTILIZATION</div></div></div>
+      <div class="chart-box"><canvas id="ch-wh" height="200"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd"><div><div class="panel-title">STOCK COVERAGE BY PRODUCT LINE</div></div></div>
+      <div id="stock-coverage"></div>
+    </div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     MODAL: CREATE ORDER
+═══════════════════════════════════════════════════════ -->
+<div class="modal-bg" id="order-modal">
+  <div class="modal">
+    <div class="modal-title">NEW ORDER</div>
+    <div class="modal-sub">AUTO-VALIDATES AGAINST SFDC · CREDIT CHECK · BSC SYNC</div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label class="form-label">Customer Account</label>
+        <select class="form-input">
+          <option>Viet Pioneer Auto JSC</option>
+          <option>Da Nang Tire Center</option>
+          <option>Hanoi Mobility Hub</option>
+          <option>Mekong Auto Parts</option>
+          <option>Pacific Wheels Vietnam</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Order Channel</label>
+        <select class="form-input">
+          <option>SFDC (Direct Sales)</option>
+          <option>E-Ordering Portal</option>
+          <option>EDI / S2S Interface</option>
+          <option>Phone / Manual</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Product (SKU)</label>
+      <select class="form-input">
+        <option>MICHELIN PILOT SPORT 5 — 225/45R17 (PS5-22545R17)</option>
+        <option>MICHELIN ENERGY XM2+ — 205/60R16 (EXM-20560R16)</option>
+        <option>MICHELIN PRIMACY 4 — 215/55R17 (P4-21555R17)</option>
+        <option>MICHELIN CROSSCLIMATE 2 — 235/55R19 (CC2-23555R19)</option>
+        <option>MICHELIN AGILIS 3 — 215/70R15C (AG3-21570R15C)</option>
+      </select>
+    </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label class="form-label">Quantity (units)</label>
+        <input type="number" class="form-input" value="200" min="1">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Requested Delivery Date</label>
+        <input type="date" class="form-input" id="del-date">
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label class="form-label">Delivery Address</label>
+        <select class="form-input">
+          <option>HCM — 45 Dien Bien Phu, Dist 3</option>
+          <option>HAN — 12 Giai Phong, Hoang Mai</option>
+          <option>DAN — 88 Le Duan, Hai Chau</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Payment Terms</label>
+        <select class="form-input">
+          <option>NET 30</option><option>NET 45</option><option>NET 60</option><option>COD</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Notes</label>
+      <input type="text" class="form-input" placeholder="Special instructions...">
+    </div>
+    <div style="padding:12px 14px;background:var(--ink3);border-radius:var(--r);font-family:var(--font-mono);font-size:10px;color:var(--mid);margin-top:4px">
+      ⚡ System will auto: validate credit limit → generate order in BSC → send confirmation to SFDC → notify 3PL → schedule invoice trigger on POD
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">CANCEL</button>
+      <button class="btn btn-red" onclick="submitOrder()">⚡ SUBMIT & AUTO-PROCESS</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════════════ -->
+<script>
+// ─── THEME ────────────────────────────────────────────
+const T = { red:'#e2001a', amber:'#d4820a', green:'#1a7a3a', blue:'#1a4a8a',
+  rL:'#ff6670', aL:'#e8a030', gL:'#44cc6a', bL:'#6698d8',
+  text:'#a8a8a8', grid:'rgba(255,255,255,0.05)', bg:'#1a1a1a' };
+Chart.defaults.color = T.text;
+Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+
+const dOpts = (extra={}) => ({
+  responsive:true, maintainAspectRatio:false,
+  plugins:{ legend:{ labels:{ color:T.text, font:{size:10}, boxWidth:10, padding:12, usePointStyle:true } },
+    tooltip:{ backgroundColor:'rgba(10,10,10,.95)', borderColor:'rgba(90,90,90,.4)', borderWidth:1,
+      titleColor:'#fafaf8', bodyColor:'#a8a8a8', padding:12, cornerRadius:6 } },
+  scales:{ x:{ ticks:{color:T.text,font:{size:10}}, grid:{color:T.grid}, border:{color:T.grid} },
+           y:{ ticks:{color:T.text,font:{size:10}}, grid:{color:T.grid}, border:{color:T.grid} } },
+  ...extra });
+
+const charts = {};
+function mkChart(id, cfg) {
+  if(charts[id]) charts[id].destroy();
+  const el = document.getElementById(id);
+  if(!el) return;
+  charts[id] = new Chart(el, cfg);
+}
+
+// ─── DATE ─────────────────────────────────────────────
+function updateDate() {
+  const now = new Date();
+  document.getElementById('topbar-date').textContent =
+    now.toLocaleDateString('en-GB',{weekday:'short',year:'numeric',month:'short',day:'numeric'}) +
+    ' · ' + now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+}
+updateDate(); setInterval(updateDate, 60000);
+document.getElementById('del-date').valueAsDate = new Date(Date.now() + 7*864e5);
+
+// ─── NAV ──────────────────────────────────────────────
+const pageTitles = {
+  dashboard:'O2C DASHBOARD', pipeline:'LIVE PIPELINE', orders:'ORDER MANAGEMENT',
+  forecast:'DEMAND FORECAST', delivery:'DELIVERY TRACKER', warehouse:'WAREHOUSE & 3PL',
+  invoice:'INVOICE TO CASH', ar:'AR & COLLECTIONS', automation:'AUTOMATION RULES ENGINE', audit:'AUDIT LOG'
+};
+function nav(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
+  document.getElementById('p-'+id)?.classList.add('active');
+  el?.classList.add('active');
+  document.getElementById('topbar-title').textContent = pageTitles[id]||id.toUpperCase();
+  initPage(id);
+}
+const initDone = new Set();
+function initPage(id) {
+  if(initDone.has(id)) return;
+  initDone.add(id);
+  const fns = { dashboard:initDash, pipeline:initPipeline, orders:initOrders,
+    forecast:initForecast, delivery:initDelivery, invoice:initInvoice,
+    ar:initAR, automation:initAutomation, audit:initAudit, warehouse:initWarehouse };
+  fns[id]?.();
+}
+initPage('dashboard');
+
+// ─── DATA ─────────────────────────────────────────────
+const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const CUSTOMERS = [
+  {id:'C001',name:'Viet Pioneer Auto JSC',city:'HCM',credit:500000,outstanding:218400,overdue:218400,d30:0,d60:218400,d90:0,util:43.7,last:'Apr 14'},
+  {id:'C002',name:'Da Nang Tire Center',city:'DAN',credit:200000,outstanding:87000,overdue:0,d30:87000,d60:0,d90:0,util:43.5,last:'Apr 12'},
+  {id:'C003',name:'Hanoi Mobility Hub',city:'HAN',credit:750000,outstanding:412000,overdue:142000,d30:270000,d60:142000,d90:0,util:54.9,last:'Apr 15'},
+  {id:'C004',name:'Mekong Auto Parts',city:'CTH',credit:150000,outstanding:34000,overdue:0,d30:34000,d60:0,d90:0,util:22.7,last:'Apr 10'},
+  {id:'C005',name:'Pacific Wheels VN',city:'HCM',credit:600000,outstanding:521000,overdue:391000,d30:130000,d60:201000,d90:190000,util:86.8,last:'Apr 16'},
+  {id:'C006',name:'Saigon Fleet Services',city:'HCM',credit:400000,outstanding:188000,overdue:0,d30:188000,d60:0,d90:0,util:47.0,last:'Apr 15'},
+  {id:'C007',name:'North Star Logistics',city:'HAN',credit:300000,outstanding:76000,overdue:0,d30:76000,d60:0,d90:0,util:25.3,last:'Apr 13'},
+  {id:'C008',name:'Central Auto Group',city:'DAN',credit:250000,outstanding:99000,overdue:0,d30:99000,d60:0,d90:0,util:39.6,last:'Apr 11'},
+];
+
+const PRODUCTS = ['PS5-22545R17','EXM-20560R16','P4-21555R17','CC2-23555R19','AG3-21570R15C','P5-21550R17','LT-20565R15','ES5-18560R15'];
+const PNAMES = {
+  'PS5-22545R17':'Pilot Sport 5 225/45R17',
+  'EXM-20560R16':'Energy XM2+ 205/60R16',
+  'P4-21555R17':'Primacy 4 215/55R17',
+  'CC2-23555R19':'CrossClimate 2 235/55R19',
+  'AG3-21570R15C':'Agilis 3 215/70R15C',
+  'P5-21550R17':'Primacy 5 215/50R17',
+  'LT-20565R15':'LTX Trail 205/65R15',
+  'ES5-18560R15':'Energy Saver 185/60R15',
+};
+const STATUS_LIST = ['Pending','Confirmed','Warehouse','In Transit','Delivered','Invoiced'];
+const STATUS_CL = {Pending:'b-blue',Confirmed:'b-green',Warehouse:'b-amber','In Transit':'b-amber',Delivered:'b-green',Invoiced:'b-gray'};
+const CHANNELS = ['SFDC Direct','E-Portal','EDI / S2S','Phone'];
+const POLS = ['NET 30','NET 45','NET 60','COD'];
+const CITIES = ['HCM','HAN','DAN','CTH','HPH'];
+
+function rnd(a,b) { return Math.floor(Math.random()*((b-a)+1))+a; }
+function fmt(n,pre='$') { return pre+(n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(0)+'K':n.toLocaleString()); }
+
+// Generate orders
+const ORDERS = Array.from({length:60},(_,i) => {
+  const d = new Date(); d.setDate(d.getDate()-rnd(0,20));
+  const eta = new Date(d); eta.setDate(eta.getDate()+rnd(1,5));
+  const qty = rnd(50,800);
+  const sku = PRODUCTS[i%PRODUCTS.length];
+  const price = rnd(45,180)*qty;
+  const si = rnd(0,STATUS_LIST.length-1);
+  const c = CUSTOMERS[i%CUSTOMERS.length];
+  return {
+    id:`ORD-2025-${1100+i}`, customer:c.name, cid:c.id,
+    product:PNAMES[sku], sku,
+    qty, value:price, channel:CHANNELS[i%4],
+    status:STATUS_LIST[si],
+    date:d.toISOString().split('T')[0],
+    eta:eta.toISOString().split('T')[0],
+    terms:POLS[i%4],
+  };
+});
+
+const INVOICES = Array.from({length:30},(_,i) => {
+  const d = new Date(); d.setDate(d.getDate()-rnd(0,30));
+  const due = new Date(d); due.setDate(due.getDate()+rnd(30,60));
+  const c = CUSTOMERS[i%CUSTOMERS.length];
+  const statuses = ['Sent','Paid','Overdue','Disputed','Draft'];
+  const s = i<3 ? 'Overdue' : i<5 ? 'Disputed' : i%5===0 ? 'Paid' : 'Sent';
+  return {
+    id:`INV-2025-${800+i}`,
+    order:`ORD-2025-${1100+i}`,
+    customer:c.name, amount:rnd(10000,250000),
+    issued:d.toISOString().split('T')[0],
+    due:due.toISOString().split('T')[0],
+    status:s, channel:CHANNELS[i%4]
+  };
+});
+
+const AUDIT_EVENTS = [
+  {ts:'2025-04-16 09:14:02',type:'ALERT',entity:'AR',id:'INV-2025-0847',action:'Auto-Hold placed on account',user:'SYSTEM · Rule AR-HOLD-45D',status:'Executed'},
+  {ts:'2025-04-16 09:10:15',type:'INVOICE',entity:'Invoice',id:'INV-2025-0897',action:'E-Invoice auto-generated',user:'SYSTEM · Rule POD-INVOICE-TRIGGER',status:'Success'},
+  {ts:'2025-04-16 08:52:30',type:'SYSTEM',entity:'Integration',id:'ORD-2025-1138',action:'SFDC→SAP sync retry initiated',user:'SYSTEM · Rule ERP-SYNC-WATCHDOG',status:'Retry'},
+  {ts:'2025-04-16 08:30:00',type:'PAYMENT',entity:'Account',id:'C002',action:'Payment matched: $87,000',user:'SYSTEM · Rule AUTO-PAYMENT-MATCH',status:'Success'},
+  {ts:'2025-04-16 07:31:11',type:'DELIVERY',entity:'Shipment',id:'SHP-1124',action:'Delay detected — customer notified',user:'SYSTEM · Rule DELIVERY-DELAY-NOTIFY',status:'Notified'},
+  {ts:'2025-04-16 07:00:00',type:'ORDER',entity:'Order',id:'ORD-2025-1158',action:'Order auto-confirmed (credit OK)',user:'SYSTEM · Rule AUTO-ORDER-CONFIRM',status:'Success'},
+  {ts:'2025-04-16 06:45:23',type:'STOCK',entity:'Product',id:'PS5-22545R17',action:'Safety stock breach — Auto-PO raised',user:'SYSTEM · Rule STOCK-SAFETY-THRESHOLD',status:'PO Raised'},
+  {ts:'2025-04-16 06:00:00',type:'REPORT',entity:'Report',id:'WEEKLY-OTD',action:'Weekly OTD report auto-sent to management',user:'SYSTEM · Rule WEEKLY-KPI-REPORT',status:'Sent'},
+  {ts:'2025-04-15 22:00:00',type:'REPL',entity:'Inventory',id:'WHM-HCM-001',action:'Replenishment PO PR-2025-0312 created',user:'SYSTEM · Rule AUTO-REPLEN',status:'Success'},
+  {ts:'2025-04-15 18:20:44',type:'INVOICE',entity:'Invoice',id:'INV-2025-0891',action:'Payment reminder sent (D+25)',user:'SYSTEM · Rule DUNNING-D25',status:'Sent'},
+  {ts:'2025-04-15 15:00:00',type:'ORDER',entity:'Order',id:'ORD-2025-1152',action:'Credit limit exceeded — manual review queued',user:'SYSTEM · Rule CREDIT-CHECK',status:'Escalated'},
+  {ts:'2025-04-15 12:34:55',type:'DELIVERY',entity:'Shipment',id:'SHP-1118',action:'POD received — invoice trigger activated',user:'SYSTEM · Rule POD-INVOICE-TRIGGER',status:'Success'},
+  {ts:'2025-04-15 09:00:00',type:'SYSTEM',entity:'System',id:'SFDC-BSC',action:'Daily BSC–SFDC reconciliation: 0 exceptions',user:'SYSTEM · Scheduled Job',status:'OK'},
+  {ts:'2025-04-15 01:30:00',type:'FINANCE',entity:'Ledger',id:'GL-APR15',action:'Nightly GL auto-posting: 234 entries',user:'SYSTEM · Rule NIGHTLY-GL-POST',status:'Success'},
+];
+
+// ─── DASHBOARD ────────────────────────────────────────
+function initDash() {
+  // Revenue chart
+  const days = Array.from({length:16},(_,i)=>`Apr ${i+1}`);
+  const invoiced = [480,520,610,430,690,715,580,640,720,690,810,740,820,780,760,840].map(v=>v*1000);
+  const collected = invoiced.map(v=>Math.round(v*(.72+Math.random()*.15)));
+  mkChart('ch-revenue',{type:'bar',data:{labels:days,datasets:[
+    {label:'Invoiced',data:invoiced.map(v=>v/1000),backgroundColor:'rgba(26,74,138,.6)',borderRadius:3},
+    {label:'Collected',data:collected.map(v=>v/1000),backgroundColor:'rgba(26,122,58,.7)',borderRadius:3},
+  ]},options:{...dOpts(),scales:{x:{ticks:{color:T.text,font:{size:9}},grid:{color:T.grid}},y:{ticks:{callback:v=>'$'+v+'K',color:T.text},grid:{color:T.grid}}}}});
+
+  // Status donut
+  mkChart('ch-status-donut',{type:'doughnut',data:{
+    labels:STATUS_LIST,
+    datasets:[{data:[18,62,44,79,31,13],backgroundColor:['rgba(26,74,138,.8)','rgba(26,122,58,.8)','rgba(212,130,10,.8)','rgba(212,130,10,.6)','rgba(26,122,58,.6)','rgba(107,107,107,.6)'],borderWidth:0,hoverOffset:6}]
+  },options:{...dOpts(),cutout:'60%',plugins:{legend:{display:true,position:'right',labels:{color:T.text,font:{size:10},boxWidth:10,padding:8}}}}});
+
+  // OTIF chart
+  const otif = [88.2,89.1,90.4,87.6,92.1,93.0,91.8,90.2,89.7,91.4,92.8,91.7];
+  mkChart('ch-otif',{type:'line',data:{labels:months,datasets:[
+    {label:'OTIF %',data:otif,borderColor:T.aL,backgroundColor:'rgba(212,130,10,.08)',fill:true,tension:.4,borderWidth:2.5,pointRadius:3},
+    {type:'line',label:'Target 95%',data:Array(12).fill(95),borderColor:'rgba(226,0,26,.5)',borderDash:[5,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ]},options:{...dOpts(),scales:{x:{ticks:{color:T.text,font:{size:9}},grid:{color:T.grid}},y:{min:84,ticks:{callback:v=>v+'%',color:T.text},grid:{color:T.grid}}}}});
+
+  // Aging
+  mkChart('ch-aging',{type:'bar',data:{
+    labels:['Current (0-30d)','31-60d','61-90d','91d+'],
+    datasets:[{label:'$',data:[3580,820,280,140],backgroundColor:['rgba(26,122,58,.8)','rgba(212,130,10,.8)','rgba(226,0,26,.7)','rgba(226,0,26,.4)'],borderRadius:4}]
+  },options:{...dOpts(),indexAxis:'y',scales:{x:{ticks:{callback:v=>'$'+v+'K',color:T.text},grid:{color:T.grid}},y:{ticks:{color:T.text,font:{size:10}},grid:{color:T.grid}}}}});
+
+  // Channel
+  mkChart('ch-channel',{type:'doughnut',data:{
+    labels:['Automotive Retail','Fleet / B2B','Online Portal','Distributors','OEM Direct'],
+    datasets:[{data:[38,27,18,11,6],backgroundColor:['rgba(26,74,138,.8)','rgba(26,122,58,.8)','rgba(212,130,10,.8)','rgba(107,107,107,.7)','rgba(226,0,26,.7)'],borderWidth:0,hoverOffset:6}]
+  },options:{...dOpts(),cutout:'55%',plugins:{legend:{display:true,position:'right',labels:{color:T.text,font:{size:10},boxWidth:10,padding:6}}}}});
+
+  // Top customers progress bars
+  const tc = document.getElementById('top-customers');
+  const sorted = [...CUSTOMERS].sort((a,b)=>b.outstanding-a.outstanding);
+  tc.innerHTML = sorted.map(c=>`
+    <div class="prog-row">
+      <span class="prog-label" title="${c.name}">${c.name.substring(0,18)}</span>
+      <div class="prog-track"><div class="prog-fill" style="width:${(c.outstanding/600000*100).toFixed(0)}%;background:${c.overdue>0?T.rL:T.bL}"></div></div>
+      <span class="prog-val">${fmt(c.outstanding)}</span>
+    </div>`).join('');
+}
+
+// ─── PIPELINE ─────────────────────────────────────────
+function initPipeline() {
+  const hours = Array.from({length:18},(_,i)=>`${6+i}:00`);
+  const in_  = hours.map(()=>rnd(8,32));
+  const out_ = hours.map(()=>rnd(6,28));
+  mkChart('ch-throughput',{type:'line',data:{labels:hours,datasets:[
+    {label:'Orders In',data:in_,borderColor:T.bL,backgroundColor:'rgba(26,74,138,.1)',fill:true,tension:.4,borderWidth:2,pointRadius:2},
+    {label:'Orders Out',data:out_,borderColor:T.gL,backgroundColor:'rgba(26,122,58,.08)',fill:true,tension:.4,borderWidth:2,pointRadius:2},
+  ]},options:{...dOpts(),scales:{x:{ticks:{color:T.text,font:{size:9}},grid:{color:T.grid}},y:{ticks:{color:T.text},grid:{color:T.grid}}}}});
+
+  renderOrderTable(ORDERS);
+}
+
+function renderOrderTable(data) {
+  const tb = document.getElementById('order-tbody');
+  if(!tb) return;
+  tb.innerHTML = data.map(o=>`<tr>
+    <td class="mono">${o.id}</td>
+    <td>${o.customer.substring(0,22)}</td>
+    <td style="color:var(--dust)">${o.product.substring(0,24)}</td>
+    <td class="mono" style="text-align:right">${o.qty}</td>
+    <td class="mono" style="color:var(--chalk)">${fmt(o.value)}</td>
+    <td><span class="badge b-gray" style="font-size:8.5px">${o.channel}</span></td>
+    <td><span class="badge ${STATUS_CL[o.status]}">${o.status}</span></td>
+    <td class="mono" style="color:var(--mid)">${o.date}</td>
+    <td class="mono" style="color:var(--mid)">${o.eta}</td>
+    <td><button class="btn btn-ghost" style="padding:4px 8px;font-size:9px" onclick="viewOrder('${o.id}')">VIEW</button></td>
+  </tr>`).join('');
+}
+
+function filterOrders(q) {
+  renderOrderTable(ORDERS.filter(o=>o.id.includes(q)||o.customer.toLowerCase().includes(q.toLowerCase())||o.product.toLowerCase().includes(q.toLowerCase())));
+}
+function filterOrderStatus(s) { renderOrderTable(s ? ORDERS.filter(o=>o.status===s) : ORDERS); }
+function viewOrder(id) { alert(`Viewing order ${id}\n\nIn a full implementation, this opens a detailed order drill-down with SFDC and BSC data, delivery tracking, and invoice status.`); }
+
+// ─── ORDERS ───────────────────────────────────────────
+function initOrders() {
+  const labels=['SFDC Direct','E-Portal','EDI / S2S','Phone'];
+  mkChart('ch-intake',{type:'bar',data:{labels,datasets:[
+    {label:'MTD Orders',data:[94,58,72,23],backgroundColor:['rgba(26,74,138,.8)','rgba(26,122,58,.8)','rgba(212,130,10,.8)','rgba(107,107,107,.7)'],borderRadius:4}
+  ]},options:{...dOpts(),plugins:{legend:{display:false}},scales:{x:{ticks:{color:T.text,font:{size:10}},grid:{color:T.grid}},y:{ticks:{color:T.text},grid:{color:T.grid}}}}});
+
+  const flow = document.getElementById('order-auto-flow');
+  const steps = [
+    {n:'1',t:'Order Capture',d:'SFDC / E-Portal / EDI',color:T.bL},
+    {n:'2',t:'Credit Check',d:'Auto-validate vs. BSC credit limit',color:T.gL},
+    {n:'3',t:'Order Confirmation',d:'87% auto-confirmed · 13% manual review',color:T.gL},
+    {n:'4',t:'3PL Notification',d:'Auto-sent to GHN/GHTK/DHL',color:T.aL},
+    {n:'5',t:'BSC Sync',d:'Order posted to SAP · SFDC updated',color:T.bL},
+  ];
+  flow.innerHTML = steps.map(s=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(58,58,58,.4)">
+      <div style="width:24px;height:24px;border-radius:50%;background:${s.color};display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--white);flex-shrink:0">${s.n}</div>
+      <div>
+        <div style="font-family:var(--font-head);font-size:12px;letter-spacing:1px;color:${s.color}">${s.t}</div>
+        <div style="font-size:11px;color:var(--dust)">${s.d}</div>
+      </div>
+    </div>`).join('');
+
+  const pending = document.getElementById('pending-tbody');
+  const reasons = ['Credit limit exceeded','Duplicate order check','Missing delivery address','Price discrepancy','Payment terms mismatch'];
+  pending.innerHTML = ORDERS.filter(o=>o.status==='Pending').slice(0,10).map((o,i)=>`<tr>
+    <td class="mono">${o.id}</td>
+    <td>${o.customer.substring(0,20)}</td>
+    <td style="color:var(--dust)">${o.product.substring(0,22)}</td>
+    <td class="mono">${fmt(o.value)}</td>
+    <td><span class="badge ${i<2?'b-red':'b-amber'}">${i<2?'Blocked':'Review'}</span></td>
+    <td style="font-size:11px;color:var(--dust)">${reasons[i%reasons.length]}</td>
+    <td class="mono" style="color:${i<2?'var(--rL)':'var(--mid)'}">${i<2?'2':'1'}d</td>
+    <td><button class="btn btn-red" style="padding:4px 8px;font-size:9px">RESOLVE</button></td>
+  </tr>`).join('');
+}
+
+// ─── FORECAST ─────────────────────────────────────────
+function initForecast() {
+  const all = [...months, ...months.slice(0,12)];
+  const labels = all.map((m,i)=>i<12?`${m} '24`:`${m} '25`).slice(4,16);
+  const actual  = [5.2,5.8,6.1,6.9,7.4,7.1,6.8,7.2,6.6,7.8,8.1,null].map(v=>v);
+  const fc      = [null,null,null,null,null,null,null,null,null,null,7.9,8.7].map(v=>v);
+  const fc_up   = fc.map(v=>v!=null?v*1.08:null);
+  const fc_dn   = fc.map(v=>v!=null?v*0.93:null);
+  mkChart('ch-demand-fc',{type:'line',data:{labels,datasets:[
+    {label:'Actual Revenue $M',data:actual,borderColor:T.bL,backgroundColor:'rgba(26,74,138,.08)',fill:true,tension:.4,borderWidth:2.5,pointRadius:4},
+    {label:'Forecast $M',data:fc,borderColor:T.gL,borderDash:[6,3],fill:false,tension:.3,borderWidth:2,pointRadius:5,pointStyle:'triangle'},
+    {label:'Upper CI',data:fc_up,borderColor:'rgba(26,122,58,.3)',fill:'+1',tension:.3,borderWidth:1,pointRadius:0},
+    {label:'Lower CI',data:fc_dn,borderColor:'rgba(26,122,58,.3)',backgroundColor:'rgba(26,122,58,.06)',fill:false,tension:.3,borderWidth:1,pointRadius:0},
+  ]},options:{...dOpts(),scales:{x:{ticks:{color:T.text,font:{size:9}},grid:{color:T.grid}},y:{ticks:{callback:v=>'$'+v+'M',color:T.text},grid:{color:T.grid}}},plugins:{legend:{display:true,position:'top',labels:{color:T.text,font:{size:10},boxWidth:10,usePointStyle:true}}}}});
+
+  const seas=[0.88,0.85,0.96,1.02,1.10,1.14,0.98,1.04,1.06,1.12,1.18,1.22];
+  mkChart('ch-season',{type:'bar',data:{labels:months,datasets:[{label:'Seasonal Index',data:seas,backgroundColor:seas.map(s=>s>1.1?'rgba(26,122,58,.8)':s>1.0?'rgba(26,74,138,.7)':'rgba(212,130,10,.7)'),borderRadius:4}]},options:{...dOpts(),plugins:{legend:{display:false}},scales:{x:{ticks:{color:T.text,font:{size:9}},grid:{color:T.grid}},y:{min:.7,ticks:{color:T.text},grid:{color:T.grid}}}}});
+
+  const sf = document.getElementById('sku-forecast');
+  const skuFc = PRODUCTS.map((s,i)=>({sku:s,name:PNAMES[s],fcQty:rnd(800,8000),growth:rnd(-5,25)}))
+    .sort((a,b)=>b.fcQty-a.fcQty);
+  sf.innerHTML = skuFc.map(s=>`
+    <div class="prog-row">
+      <span class="prog-label" title="${s.name}" style="flex:0 0 170px">${s.name.substring(0,24)}</span>
+      <div class="prog-track"><div class="prog-fill" style="width:${(s.fcQty/8000*100).toFixed(0)}%;background:${s.growth>0?T.gL:T.rL}"></div></div>
+      <span style="font-family:var(--font-mono);font-size:10px;color:${s.growth>0?T.gL:T.rL};width:44px;text-align:right">${s.growth>0?'+':''}${s.growth}%</span>
+    </div>`).join('');
+}
+
+// ─── DELIVERY ─────────────────────────────────────────
+function initDelivery() {
+  const gantt = document.getElementById('gantt-view');
+  const shipments = [
+    {id:'SHP-1101',name:'Viet Pioneer Auto',w:82,delay:false,eta:'Apr 17'},
+    {id:'SHP-1102',name:'Da Nang Tire Ctr',w:65,delay:false,eta:'Apr 18'},
+    {id:'SHP-1103',name:'Hanoi Mobility',w:91,delay:false,eta:'Apr 17'},
+    {id:'SHP-1104',name:'Pacific Wheels',w:45,delay:true,eta:'Apr 20 ⚠'},
+    {id:'SHP-1105',name:'Mekong Auto',w:78,delay:false,eta:'Apr 18'},
+    {id:'SHP-1106',name:'Saigon Fleet',w:30,delay:true,eta:'Apr 21 ⚠'},
+    {id:'SHP-1107',name:'North Star Log.',w:95,delay:false,eta:'Apr 17'},
+    {id:'SHP-1108',name:'Central Auto Grp',w:60,delay:false,eta:'Apr 19'},
+    {id:'SHP-1109',name:'Southern Tire Co',w:22,delay:true,eta:'Apr 22 ⚠'},
+    {id:'SHP-1110',name:'Mekong Distrib.',w:88,delay:false,eta:'Apr 17'},
+  ];
+  gantt.innerHTML = shipments.map(s=>`
+    <div class="timeline-row">
+      <span class="tl-id">${s.id}</span>
+      <span class="tl-name">${s.name}</span>
+      <div class="tl-bar-wrap">
+        <div class="tl-bar" style="width:${s.w}%;background:${s.delay?'rgba(226,0,26,.5)':'rgba(26,122,58,.5)'}">
+          <span class="tl-bar-label">${s.w}% complete</span>
+        </div>
+      </div>
+      <span class="tl-eta" style="color:${s.delay?T.rL:T.gL}">${s.eta}</span>
+    </div>`).join('');
+
+  const sc = document.getElementById('tpl-scorecard');
+  const tpls = [
+    {name:'GHN Express',otd:'97.2%',claims:'0.3%',cost:'$2.4/kg',rating:5,c:T.gL},
+    {name:'GHTK',otd:'94.8%',claims:'0.7%',cost:'$2.1/kg',rating:4,c:T.gL},
+    {name:'DHL Supply Chain',otd:'99.1%',claims:'0.1%',cost:'$3.8/kg',rating:5,c:T.gL},
+    {name:'Viettel Post',otd:'91.4%',claims:'1.2%',cost:'$1.9/kg',rating:3,c:T.aL},
+  ];
+  sc.innerHTML = `<table style="width:100%;border-collapse:collapse">
+    <thead><tr>${['3PL Partner','OTD Rate','Claims Rate','Cost/kg','Rating'].map(h=>`<th style="text-align:left;padding:7px 10px;font-family:var(--font-mono);font-size:9px;color:var(--mid);text-transform:uppercase;letter-spacing:1.5px;border-bottom:1px solid var(--wire)">${h}</th>`).join('')}</tr></thead>
+    <tbody>${tpls.map(t=>`<tr style="border-bottom:1px solid rgba(58,58,58,.4)">
+      <td style="padding:8px 10px;font-size:12px">${t.name}</td>
+      <td style="padding:8px 10px;font-family:var(--font-mono);font-size:12px;color:${t.c}">${t.otd}</td>
+      <td style="padding:8px 10px;font-family:var(--font-mono);font-size:12px">${t.claims}</td>
+      <td style="padding:8px 10px;font-family:var(--font-mono);font-size:12px;color:var(--mid)">${t.cost}</td>
+      <td style="padding:8px 10px;color:${t.c}">${'★'.repeat(t.rating)+'☆'.repeat(5-t.rating)}</td>
+    </tr>`).join('')}</tbody></table>`;
+
+  mkChart('ch-region',{type:'bar',data:{
+    labels:['HCM','Hanoi','Da Nang','Can Tho','Hai Phong','Hue','Nha Trang'],
+    datasets:[{label:'Shipments',data:[38,22,12,8,7,5,4],backgroundColor:'rgba(26,74,138,.7)',borderRadius:4}]
+  },options:{...dOpts(),plugins:{legend:{display:false}},indexAxis:'y',scales:{x:{ticks:{color:T.text},grid:{color:T.grid}},y:{ticks:{color:T.text,font:{size:10}},grid:{color:T.grid}}}}});
+}
+
+// ─── INVOICE ──────────────────────────────────────────
+function initInvoice() {
+  const lbl=['POD Received','Invoice Generated','BSC Posted','SFDC Updated','E-Invoice Sent','Payment Cleared'];
+  const cnt=[31,31,30,30,29,22];
+  mkChart('ch-inv-flow',{type:'bar',data:{labels:lbl,datasets:[{label:'Count',data:cnt,backgroundColor:['rgba(212,130,10,.7)','rgba(26,74,138,.7)','rgba(26,74,138,.7)','rgba(26,122,58,.7)','rgba(26,122,58,.7)','rgba(26,122,58,.9)'],borderRadius:4}]},options:{...dOpts(),plugins:{legend:{display:false}},scales:{x:{ticks:{color:T.text,font:{size:9}},grid:{color:T.grid}},y:{ticks:{color:T.text},grid:{color:T.grid}}}}});
+
+  const q = document.getElementById('inv-queue');
+  const qItems = ORDERS.filter(o=>o.status==='Delivered').slice(0,6);
+  q.innerHTML = qItems.map(o=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(58,58,58,.4)">
+      <div style="flex:1">
+        <div class="mono" style="font-size:10px;color:var(--dust)">${o.id}</div>
+        <div style="font-size:11px">${o.customer.substring(0,22)}</div>
+      </div>
+      <div class="mono" style="font-size:11px;color:var(--chalk)">${fmt(o.value)}</div>
+      <button class="btn btn-red" style="padding:3px 8px;font-size:9px" onclick="genInvoice('${o.id}')">⚡ INVOICE</button>
+    </div>`).join('');
+
+  const tb = document.getElementById('inv-tbody');
+  const stCl = {Sent:'b-blue',Paid:'b-green',Overdue:'b-red',Disputed:'b-amber',Draft:'b-gray'};
+  tb.innerHTML = INVOICES.map(inv=>`<tr>
+    <td class="mono" style="color:var(--chalk)">${inv.id}</td>
+    <td class="mono" style="color:var(--mid)">${inv.order}</td>
+    <td>${inv.customer.substring(0,20)}</td>
+    <td class="mono">${fmt(inv.amount)}</td>
+    <td class="mono" style="color:var(--mid)">${inv.issued}</td>
+    <td class="mono" style="color:var(--mid)">${inv.due}</td>
+    <td><span class="badge ${stCl[inv.status]}">${inv.status}</span></td>
+    <td><span class="badge b-gray" style="font-size:8.5px">${inv.channel}</span></td>
+  </tr>`).join('');
+}
+
+// ─── AR ───────────────────────────────────────────────
+function initAR() {
+  mkChart('ch-aging2',{type:'bar',data:{
+    labels:['Current\n0-30d','31-60d','61-90d','91d+'],
+    datasets:[{data:[3580,820,280,140],backgroundColor:['rgba(26,122,58,.8)','rgba(212,130,10,.8)','rgba(226,0,26,.7)','rgba(226,0,26,.4)'],borderRadius:4}]
+  },options:{...dOpts(),plugins:{legend:{display:false}},scales:{x:{ticks:{color:T.text,font:{size:10}},grid:{color:T.grid}},y:{ticks:{callback:v=>'$'+v+'K',color:T.text},grid:{color:T.grid}}}}});
+
+  const od = document.getElementById('overdue-list');
+  const overdue = CUSTOMERS.filter(c=>c.overdue>0);
+  od.innerHTML = overdue.map(c=>`
+    <div class="alert alert-crit" style="margin-bottom:8px">
+      <div class="alert-icon">🔴</div>
+      <div style="flex:1">
+        <div class="alert-title" style="font-size:12px">${c.name}</div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--dust)">Overdue: ${fmt(c.overdue)} · Outstanding: ${fmt(c.outstanding)} · Limit: ${fmt(c.credit)} · Util: ${c.util}%</div>
+      </div>
+      <button class="btn btn-red" style="font-size:9px;flex-shrink:0" onclick="sendDunning('${c.id}')">DUNNING</button>
+    </div>`).join('');
+
+  const tb = document.getElementById('ar-tbody');
+  tb.innerHTML = CUSTOMERS.map(c=>{
+    const util = c.util;
+    const utilColor = util>80?T.rL:util>60?T.aL:T.gL;
+    return `<tr>
+      <td>${c.name.substring(0,22)}</td>
+      <td class="mono">${fmt(c.outstanding)}</td>
+      <td class="mono" style="color:${T.gL}">${fmt(c.d30)}</td>
+      <td class="mono" style="color:${c.d60>0?T.aL:'var(--mid)'}">${fmt(c.d60)}</td>
+      <td class="mono" style="color:${c.d90>0?T.rL:'var(--mid)'}">${fmt(c.d90)}</td>
+      <td class="mono" style="color:${c.overdue>0?T.rL:'var(--mid)'}">${fmt(c.overdue)}</td>
+      <td class="mono">${fmt(c.credit)}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="flex:1;height:4px;background:var(--ink3);border-radius:2px;overflow:hidden">
+            <div style="width:${util}%;height:100%;background:${utilColor}"></div>
+          </div>
+          <span style="font-family:var(--font-mono);font-size:9px;color:${utilColor}">${util}%</span>
+        </div>
+      </td>
+      <td><span class="badge ${c.overdue>0?'b-red':c.util>80?'b-amber':'b-green'}">${c.overdue>0?'On Hold':c.util>80?'High Util':'Active'}</span></td>
+      <td class="mono" style="color:var(--mid)">${c.last}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── AUTOMATION ───────────────────────────────────────
+function initAutomation() {
+  const ruleGroups = {
+    'rules-orders': [
+      {ico:'📝',t:'Auto-Order Confirmation',d:'Credit OK + product available → auto-confirm within 5 min. No human required.',trigger:'On: SFDC order created · IF credit < 80% limit AND stock > 0',active:true,col:'rgba(26,74,138,.2)'},
+      {ico:'🚫',t:'Credit Limit Block',d:'Order exceeds credit limit → block + notify credit manager + suspend account.',trigger:'On: Order value > remaining credit · Notify: Finance Director',active:true,col:'rgba(226,0,26,.15)'},
+      {ico:'🔁',t:'Duplicate Order Detection',d:'Compare SKU + customer + date window → flag duplicates for manual review.',trigger:'On: Order created · Match: same SKU + customer within 24h',active:true,col:'rgba(212,130,10,.15)'},
+    ],
+    'rules-finance': [
+      {ico:'🧾',t:'Auto-Invoice on POD',d:'Delivery confirmed by 3PL → trigger e-invoice generation in BSC → sync to SFDC → email to customer.',trigger:'On: POD received from 3PL API · Avg cycle: 4.2 hours',active:true,col:'rgba(26,122,58,.15)'},
+      {ico:'📬',t:'Dunning Auto-Escalation',d:'Day 10: reminder. Day 25: 2nd notice. Day 35: account manager alert. Day 45: legal hold.',trigger:'On: Invoice unpaid · Schedule: D+10, D+25, D+35, D+45',active:true,col:'rgba(212,130,10,.15)'},
+      {ico:'⚖️',t:'Payment Auto-Matching',d:'Incoming payment → match to open invoices by amount/reference → post to BSC GL automatically.',trigger:'On: Bank statement import · Match rate: 97.4%',active:true,col:'rgba(26,122,58,.15)'},
+      {ico:'📊',t:'Month-End AR Reconciliation',d:'Auto-reconcile AR ledger vs. BSC on last day of month. Flag exceptions to Finance team.',trigger:'Schedule: Last calendar day · Run time: 01:30 VN local',active:true,col:'rgba(26,74,138,.15)'},
+    ],
+    'rules-logistics': [
+      {ico:'🚚',t:'3PL Auto-Dispatch',d:'Confirmed order → auto-generate pick list → push to 3PL WMS API → booking confirmation.',trigger:'On: Order confirmed · 3PL: GHN / GHTK / DHL auto-selected by zone',active:true,col:'rgba(26,74,138,.15)'},
+      {ico:'⚠️',t:'Delay Detection & Notify',d:'3PL GPS shows delay > 4h vs ETA → auto-notify customer by email + SMS → log incident.',trigger:'On: GPS delta > 4h · Notify: Customer + Account Manager',active:true,col:'rgba(226,0,26,.12)'},
+      {ico:'📦',t:'Safety Stock Trigger',d:'SKU stock < 7-day cover → auto-raise replenishment PO to regional hub → notify planner.',trigger:'On: Inventory < safety stock threshold · Run: Nightly 22:00',active:true,col:'rgba(212,130,10,.15)'},
+    ],
+    'rules-system': [
+      {ico:'🔗',t:'SFDC–SAP Real-Time Sync',d:'All order/invoice/payment events sync between SFDC and BSC in < 5 min via middleware.',trigger:'On: Any entity change · SLA: < 5 min · Watchdog: 2h timeout',active:true,col:'rgba(26,74,138,.15)'},
+      {ico:'🔄',t:'ERP Sync Watchdog',d:'Monitor SFDC→BSC interface. If sync fails > 2h → auto-retry 3x → escalate to IT via Jira.',trigger:'On: Sync lag > 120 min · Escalate: Jira ticket auto-created',active:true,col:'rgba(212,130,10,.15)'},
+      {ico:'📋',t:'Weekly KPI Report',d:'Every Monday 06:00 — generate OTIF, DSO, AR aging, revenue vs forecast — email to leadership.',trigger:'Schedule: Mon 06:00 VN local · Recipients: S2C Manager + CFO',active:true,col:'rgba(26,122,58,.15)'},
+      {ico:'🔐',t:'Access Rights Audit',d:'Monthly review of user permissions in BSC and SFDC. Flag dormant accounts for de-provisioning.',trigger:'Schedule: 1st of month · SoD check: auto-cross-reference roles',active:false,col:'rgba(107,107,107,.15)'},
+    ],
+  };
+
+  Object.entries(ruleGroups).forEach(([id, rules])=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.innerHTML = rules.map(r=>`
+      <div class="rule-card">
+        <div class="rule-icon" style="background:${r.col}">${r.ico}</div>
+        <div style="flex:1">
+          <div class="rule-title">${r.t}</div>
+          <div class="rule-desc">${r.d}</div>
+          <div class="rule-trigger">⚡ ${r.trigger}</div>
+        </div>
+        <div class="rule-toggle ${r.active?'':'off'}" onclick="toggleRule(this)" title="${r.active?'Active':'Inactive'}"></div>
+      </div>`).join('');
+  });
+}
+
+// ─── AUDIT ────────────────────────────────────────────
+function initAudit() {
+  const typeCl = {ALERT:'b-red',INVOICE:'b-blue',SYSTEM:'b-gray',PAYMENT:'b-green',DELIVERY:'b-amber',ORDER:'b-blue',STOCK:'b-amber',REPORT:'b-gray',REPL:'b-amber',FINANCE:'b-green'};
+  const tb = document.getElementById('audit-tbody');
+  tb.innerHTML = AUDIT_EVENTS.map(e=>`<tr>
+    <td class="mono" style="color:var(--mid);font-size:10px">${e.ts}</td>
+    <td><span class="badge ${typeCl[e.type]||'b-gray'}">${e.type}</span></td>
+    <td style="color:var(--dust)">${e.entity}</td>
+    <td class="mono" style="color:var(--dust)">${e.id}</td>
+    <td style="font-size:12px">${e.action}</td>
+    <td style="font-family:var(--font-mono);font-size:10px;color:var(--mid)">${e.user}</td>
+    <td><span class="badge ${e.status==='Success'||e.status==='OK'||e.status==='Executed'?'b-green':e.status==='Escalated'||e.status==='Retry'?'b-amber':'b-blue'}">${e.status}</span></td>
+    <td><button class="btn btn-ghost" style="padding:3px 7px;font-size:8.5px">DETAIL</button></td>
+  </tr>`).join('');
+}
+
+// ─── WAREHOUSE ────────────────────────────────────────
+function initWarehouse() {
+  const wh = ['HCM Central','Hanoi North','Da Nang Hub'];
+  const cap = [82, 67, 45];
+  mkChart('ch-wh',{type:'bar',data:{labels:wh,datasets:[
+    {label:'Used %',data:cap,backgroundColor:cap.map(v=>v>80?'rgba(226,0,26,.7)':v>60?'rgba(212,130,10,.7)':'rgba(26,122,58,.7)'),borderRadius:4},
+    {label:'Available %',data:cap.map(v=>100-v),backgroundColor:'rgba(255,255,255,.04)',borderRadius:4},
+  ]},options:{...dOpts({scales:{x:{stacked:true,ticks:{color:T.text},grid:{color:T.grid}},y:{stacked:true,ticks:{callback:v=>v+'%',color:T.text},grid:{color:T.grid}}}}),plugins:{legend:{display:true,position:'top',labels:{color:T.text,font:{size:10},boxWidth:10}}}}});
+
+  const sc = document.getElementById('stock-coverage');
+  const lines = [
+    {n:'Pilot Sport Series',cover:'28d',pct:82,c:T.gL},
+    {n:'Energy XM2+ Series',cover:'35d',pct:100,c:T.gL},
+    {n:'Primacy Series',cover:'14d',pct:42,c:T.aL},
+    {n:'CrossClimate Series',cover:'7d',pct:20,c:T.rL},
+    {n:'Agilis / LT Series',cover:'42d',pct:100,c:T.gL},
+    {n:'Energy Saver Series',cover:'21d',pct:63,c:T.gL},
+  ];
+  sc.innerHTML = lines.map(l=>`
+    <div class="prog-row">
+      <span class="prog-label" style="flex:0 0 160px">${l.n}</span>
+      <div class="prog-track"><div class="prog-fill" style="width:${l.pct}%;background:${l.c}"></div></div>
+      <span style="font-family:var(--font-mono);font-size:10px;color:${l.c};width:44px;text-align:right">${l.cover}</span>
+    </div>`).join('');
+}
+
+// ─── INTERACTIONS ─────────────────────────────────────
+function openOrderModal() {
+  document.getElementById('order-modal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('order-modal').classList.remove('open');
+}
+function submitOrder() {
+  closeModal();
+  const id = 'ORD-2025-'+Math.floor(1200+Math.random()*100);
+  setTimeout(()=>alert(`✅ Order ${id} auto-processed!\n\n⚡ Credit check: PASSED\n⚡ BSC order created\n⚡ SFDC opportunity linked\n⚡ 3PL GHN notified for pick-up\n⚡ Invoice trigger set on POD receipt\n\nEstimated delivery: ${new Date(Date.now()+5*864e5).toDateString()}`), 300);
+}
+function toggleRule(el) { el.classList.toggle('off'); }
+function genInvoice(id) { alert(`⚡ Auto-generating invoice for ${id}...\n\nInvoice created in BSC → Synced to SFDC → E-Invoice sent to customer\n\nExpected: INV-2025-${Math.floor(900+Math.random()*99)}`); }
+function runAutoInvoice() { alert('⚡ Auto-Invoice batch run initiated!\n\n12 orders with confirmed POD will be invoiced.\nEstimated completion: 4.2 hours.\nNotifications will be sent on completion.'); }
+function runDunning() { alert('⚡ Dunning batch initiated!\n\n• D+10 reminders: 8 invoices\n• D+25 2nd notices: 4 invoices\n• D+45 legal hold: 2 accounts\n\nAll notifications queued.'); }
+function sendDunning(id) { alert(`⚡ Dunning notice sent to account ${id}.\n\nEscalation email sent to Account Manager + Finance Director.\nAccount placed on "Payment Watch" status.`); }
+function exportData() {
+  const csv = 'ORDER ID,CUSTOMER,PRODUCT,QTY,VALUE,STATUS,DATE\n' +
+    ORDERS.map(o=>`${o.id},${o.customer},${o.product},${o.qty},${o.value},${o.status},${o.date}`).join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='michelin_o2c_export.csv'; a.click();
+}
+function updatePeriod(p) { console.log('Period:', p); }
+function sortTbl(tbl,col) {}
+
+// Close modal on backdrop click
+document.getElementById('order-modal').addEventListener('click', e => {
+  if(e.target.id==='order-modal') closeModal();
+});
+
+// Auto-refresh simulation
+setInterval(()=>{
+  // Simulate live KPI ticks (minor fluctuations)
+  const kpiVals = document.querySelectorAll('.kpi-val');
+  // just pulse the live indicator
+}, 30000);
+</script>
+</body>
+</html>
