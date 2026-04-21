@@ -1695,12 +1695,220 @@ document.getElementById('order-modal').addEventListener('click', e => {
   if(e.target.id==='order-modal') closeModal();
 });
 
-// Auto-refresh simulation
-setInterval(()=>{
-  // Simulate live KPI ticks (minor fluctuations)
-  const kpiVals = document.querySelectorAll('.kpi-val');
-  // just pulse the live indicator
-}, 30000);
+// 
+// ════════════════════════════════════════════════════════════════
+//  FIREBASE REALTIME DATABASE — LIVE DATA SYNC
+//  Project: michelin-ff255
+//  Flow: Google Sheet → Apps Script → Firebase RTDB → Website
+// ════════════════════════════════════════════════════════════════
+
+const FB_DB_URL = "https://michelin-ff255-default-rtdb.asia-southeast1.firebasedatabase.app";
+
+// Plain REST helper — no SDK needed
+async function fbGet(path) {
+  try {
+    const r = await fetch(`${FB_DB_URL}/${path}.json`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    return data;
+  } catch(e) {
+    console.warn(`[Firebase] ${path}: ${e.message}`);
+    return null;
+  }
+}
+
+// ── Format helpers ────────────────────────────────────────────
+const fmtMoney = (v, p='$') => {
+  if (!v && v!==0) return '—';
+  const n = +v;
+  if (n>=1e6) return p+(n/1e6).toFixed(2)+'M';
+  if (n>=1e3) return p+(n/1e3).toFixed(0)+'K';
+  return p+n.toLocaleString();
+};
+const fmtPct = v => v!==undefined ? (+v*100).toFixed(1)+'%' : '—';
+
+const STATUS_BADGE = {
+  'Pending':'b-blue','Confirmed':'b-green','In Transit':'b-amber',
+  'Warehouse':'b-amber','Delivered':'b-green','Invoiced':'b-gray','Collected':'b-gray'
+};
+
+// ── Apply KPIs to DOM ─────────────────────────────────────────
+function applyKPIs(k) {
+  if (!k) return;
+  // Map: [domId, value, formatter]
+  const map = [
+    ['kpi-orders',      k.totalOrders,      v => v],
+    ['kpi-revenue',     k.revenueMTD,       fmtMoney],
+    ['kpi-fulfillment', k.fulfillmentRate,  fmtPct],
+    ['kpi-otif',        k.otifRate,         fmtPct],
+    ['kpi-cash',        k.cashCollected,    fmtMoney],
+    ['kpi-otd',         k.onTimeDelivery,   fmtPct],
+    ['kpi-pending',     k.pendingOrders,    v => v],
+    ['kpi-dso',         k.dso,              v => (+v).toFixed(1)+'d'],
+    ['kpi-ar-overdue',  k.arOverdue,        fmtMoney],
+  ];
+  map.forEach(([id, val, fmt]) => {
+    const el = document.getElementById(id);
+    if (el && val !== undefined) el.textContent = fmt(val);
+  });
+
+  // Sidebar sync time
+  let el = document.getElementById('fb-sync-time');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'fb-sync-time';
+    el.style.cssText = 'font-family:var(--font-mono);font-size:9px;color:var(--t3);margin-top:3px';
+    document.querySelector('.sidebar-footer')?.appendChild(el);
+  }
+  const t = k.lastSynced ? new Date(k.lastSynced).toLocaleString('vi-VN',{
+    hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : new Date().toLocaleTimeString('vi-VN');
+  el.textContent = `Sheet sync: ${t}`;
+}
+
+// ── Render order table ────────────────────────────────────────
+function applyOrders(ordersObj) {
+  const tbody = document.getElementById('order-tbody');
+  if (!tbody || !ordersObj) return;
+  const rows = Object.values(ordersObj).sort((a,b)=>((b.date||'')>(a.date||'')?1:-1));
+  tbody.innerHTML = rows.slice(0,60).map(o => `
+    <tr>
+      <td class="mono">${o.orderId||'—'}</td>
+      <td>${(o.customer||'').substring(0,22)}</td>
+      <td style="color:var(--dust)">${(o.product||'').substring(0,24)}</td>
+      <td class="mono" style="text-align:right">${o.qty||0}</td>
+      <td class="mono">${fmtMoney(o.totalValue)}</td>
+      <td><span class="badge b-gray" style="font-size:8.5px">${o.channel||'—'}</span></td>
+      <td><span class="badge ${STATUS_BADGE[o.status]||'b-gray'}">${o.status||'—'}</span></td>
+      <td class="mono" style="color:var(--mid)">${o.date||'—'}</td>
+      <td class="mono" style="color:var(--mid)">${o.eta||'—'}</td>
+      <td><button class="btn btn-ghost" style="padding:4px 8px;font-size:9px">VIEW</button></td>
+    </tr>`).join('');
+
+  // Update pipeline stage counts
+  const stages = ['Pending','Confirmed','Warehouse','In Transit','Delivered','Invoiced','Collected'];
+  stages.forEach((s,i) => {
+    const cnt = rows.filter(o=>o.status===s).length;
+    const el  = document.querySelector(`.pipe-stage:nth-child(${i+1}) .ps-count`);
+    if (el) el.textContent = cnt;
+  });
+
+  // Update pending badge in sidebar
+  const badge = document.querySelector('[onclick="nav(\'orders\',this)"] .sb-count');
+  if (badge) badge.textContent = rows.filter(o=>o.status==='Pending').length;
+
+  // Update top customers bar (revenue per customer)
+  const byCust = {};
+  rows.forEach(o => { byCust[o.customer] = (byCust[o.customer]||0) + (+o.totalValue||0); });
+  const custEl = document.getElementById('top-customers');
+  if (custEl) {
+    const sorted = Object.entries(byCust).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    const maxVal = sorted[0]?.[1] || 1;
+    custEl.innerHTML = sorted.map(([name,val])=>`
+      <div class="prog-row" style="display:flex;align-items:center;gap:10px;padding:5px 0">
+        <span style="font-family:var(--font-body);font-size:12px;color:var(--t2);width:185px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
+        <div style="flex:1;height:5px;background:var(--s3);border-radius:3px;overflow:hidden">
+          <div style="width:${(val/maxVal*100).toFixed(0)}%;height:100%;background:var(--accent);border-radius:3px;transition:width .8s"></div>
+        </div>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--t2);width:60px;text-align:right">${fmtMoney(val)}</span>
+      </div>`).join('');
+  }
+
+  // Rebuild channel donut chart
+  const byChannel = {};
+  rows.forEach(o => { byChannel[o.channel] = (byChannel[o.channel]||0) + (+o.totalValue||0); });
+  if (window._fbCharts?.channel) {
+    window._fbCharts.channel.data.labels   = Object.keys(byChannel);
+    window._fbCharts.channel.data.datasets[0].data = Object.values(byChannel);
+    window._fbCharts.channel.update('none');
+  }
+
+  // Rebuild revenue/cash chart
+  const byDay = {};
+  rows.forEach(o => {
+    if (!o.date) return;
+    const d = o.date.slice(8,10);
+    byDay[d] = byDay[d]||{inv:0,coll:0};
+    byDay[d].inv += (+o.totalValue||0);
+    if (o.status==='Collected') byDay[d].coll += (+o.totalValue||0);
+  });
+  const dKeys = Object.keys(byDay).sort();
+  if (window._fbCharts?.revenue) {
+    window._fbCharts.revenue.data.labels = dKeys.map(d=>`Apr ${d}`);
+    window._fbCharts.revenue.data.datasets[0].data = dKeys.map(d=>byDay[d].inv/1000);
+    window._fbCharts.revenue.data.datasets[1].data = dKeys.map(d=>byDay[d].coll/1000);
+    window._fbCharts.revenue.update('none');
+  }
+}
+
+// ── Render inventory bars ─────────────────────────────────────
+function applyInventory(invObj) {
+  const el = document.getElementById('stock-coverage');
+  if (!el || !invObj) return;
+  const items = Object.values(invObj);
+  el.innerHTML = items.map(item => {
+    const pct = Math.min(100, (+item.stockQty||0)/Math.max(+item.reorderPt||1,1)*50);
+    const clr = (item.status||'').includes('REORDER') ? 'var(--red)' :
+                (item.status||'').includes('LOW')     ? 'var(--a4)' : 'var(--a3)';
+    const cover = (+item.dos||0)+'d';
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <span style="font-family:var(--font-body);font-size:11.5px;color:var(--t2);width:165px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.product||item.sku}</span>
+      <div style="flex:1;height:5px;background:var(--s3);border-radius:3px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${clr};border-radius:3px"></div>
+      </div>
+      <span style="font-family:var(--font-mono);font-size:10px;color:${clr};width:34px;text-align:right">${cover}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Update sidebar status dot ─────────────────────────────────
+function setDotStatus(ok) {
+  const dot = document.querySelector('.dot-green');
+  if (!dot) return;
+  dot.style.background = ok ? 'var(--a3)' : '#f59e0b';
+  dot.style.boxShadow  = ok ? '0 0 8px var(--a3)' : '0 0 8px #f59e0b';
+}
+
+// ── MAIN SYNC ─────────────────────────────────────────────────
+async function syncFromFirebase() {
+  console.log('[Firebase] Syncing...');
+  const [kpis, orders, customers, inventory] = await Promise.all([
+    fbGet('kpis'),
+    fbGet('orders'),
+    fbGet('customers'),
+    fbGet('inventory'),
+  ]);
+
+  const hasData = !!(kpis || orders || customers || inventory);
+  applyKPIs(kpis);
+  applyOrders(orders);
+  applyInventory(inventory);
+  setDotStatus(hasData);
+
+  if (!hasData) {
+    console.warn('[Firebase] No data yet — using demo data. Run Apps Script sync first.');
+  } else {
+    console.log('[Firebase] Sync complete ✅');
+  }
+}
+
+// ── Store chart refs so Firebase can update them ──────────────
+window._fbCharts = {};
+const _mkOrig = window.mkChart;
+if (typeof _mkOrig === 'function') {
+  window.mkChart = function(id, config) {
+    const chart = _mkOrig(id, config);
+    if (id === 'ch-channel') window._fbCharts.channel = chart;
+    if (id === 'ch-revenue') window._fbCharts.revenue = chart;
+    return chart;
+  };
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  setTimeout(syncFromFirebase, 1200);   // initial load
+  setInterval(syncFromFirebase, 60000); // refresh every 60s
+});
+
 </script>
 </body>
 </html>
